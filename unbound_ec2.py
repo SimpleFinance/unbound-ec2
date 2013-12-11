@@ -129,6 +129,8 @@ def handle_forward(id, event, qstate, qdata):
 
     qstate.return_msg.rep.security = 2
     qstate.ext_state[id] = MODULE_FINISHED
+    if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg, 0):
+        log_warn("Unable to store query in cache. possibly out of memory.")
     return True
 
 def handle_pass(id, event, qstate, qdata):
@@ -143,6 +145,11 @@ def handle_error(id, event, qstate, qdata):
     log_err("unbound_ec2: bad event")
     qstate.ext_state[id] = MODULE_ERROR
     return True
+
+
+##############################################################################
+# Connection handling
+##############################################################################
 
 
 class Connection(https.CertValidatingHTTPSConnection):
