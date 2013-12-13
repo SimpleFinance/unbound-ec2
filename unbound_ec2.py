@@ -29,7 +29,10 @@ ZONE = None
 TTL = None
 ec2 = None
 
-def init(id, cfg):
+def ec2_log(msg):
+    log_info("unbound_ec2: %s" % msg)
+
+def init(id_, cfg):
     global ZONE
     global TTL
     global ec2
@@ -43,36 +46,36 @@ def init(id, cfg):
     if not ZONE.endswith("."):
         ZONE += "."
 
-    log_info("unbound_ec2: connected to aws region %s" % aws_region)
-    log_info("unbound_ec2: authoritative for zone %s" % ZONE)
+    ec2_log("connected to aws region %s" % aws_region)
+    ec2_log("authoritative for zone %s" % ZONE)
 
     return True
 
-def deinit(id): return True
+def deinit(id_): return True
 
-def inform_super(id, qstate, superqstate, qdata): return True
+def inform_super(id_, qstate, superqstate, qdata): return True
 
-def operate(id, event, qstate, qdata):
+def operate(id_, event, qstate, qdata):
     global ZONE
-    
+
     if (event == MODULE_EVENT_NEW) or (event == MODULE_EVENT_PASS):
         if (qstate.qinfo.qtype == RR_TYPE_A) or (qstate.qinfo.qtype == RR_TYPE_ANY):
             qname = qstate.qinfo.qname_str
             if qname.endswith(ZONE):
-                log_info("unbound_ec2: handling forward query for %s" % qname)
-                return handle_forward(id, event, qstate, qdata)
+                ec2_log("handling forward query for %s" % qname)
+                return handle_forward(id_, event, qstate, qdata)
 
-        # Fall through; pass on this request.    
-        return handle_pass(id, event, qstate, qdata)
+        # Fall through; pass on this request.
+        return handle_pass(id_, event, qstate, qdata)
 
     if event == MODULE_EVENT_MODDONE:
-        return handle_finished(id, event, qstate, qdata)
+        return handle_finished(id_, event, qstate, qdata)
 
-    return handle_error(id, event, qstate, qdata)
+    return handle_error(id_, event, qstate, qdata)
 
-def handle_forward(id, event, qstate, qdata):
+def handle_forward(id_, event, qstate, qdata):
     global TTL
-    
+
     qname = qstate.qinfo.qname_str
     msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA | PKT_AA)
 
@@ -84,6 +87,7 @@ def handle_forward(id, event, qstate, qdata):
                  for instance in reservation.instances]
 
     if len(instances) == 0:
+        ec2_log("no results found")
         qstate.return_rcode = RCODE_NXDOMAIN
     else:
         qstate.return_rcode = RCODE_NOERROR
@@ -94,22 +98,22 @@ def handle_forward(id, event, qstate, qdata):
             msg.answer.append(record)
 
     if not msg.set_return_msg(qstate):
-        qstate.ext_state[id] = MODULE_ERROR 
+        qstate.ext_state[id_] = MODULE_ERROR
         return True
 
     qstate.return_msg.rep.security = 2
-    qstate.ext_state[id] = MODULE_FINISHED 
+    qstate.ext_state[id_] = MODULE_FINISHED
     return True
 
-def handle_pass(id, event, qstate, qdata):
-    qstate.ext_state[id] = MODULE_WAIT_MODULE 
+def handle_pass(id_, event, qstate, qdata):
+    qstate.ext_state[id_] = MODULE_WAIT_MODULE
     return True
 
-def handle_finished(id, event, qstate, qdata):
-    qstate.ext_state[id] = MODULE_FINISHED 
+def handle_finished(id_, event, qstate, qdata):
+    qstate.ext_state[id_] = MODULE_FINISHED
     return True
 
-def handle_error(id, event, qstate, qdata):      
-    log_err("unbound_ec2: bad event")
-    qstate.ext_state[id] = MODULE_ERROR
+def handle_error(id_, event, qstate, qdata):
+    ec2_log("bad event")
+    qstate.ext_state[id_] = MODULE_ERROR
     return True
