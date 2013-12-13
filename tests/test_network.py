@@ -40,26 +40,33 @@ python:
 
 class TestBadNetword(TestCase):
 
+    @staticmethod
+    def _start_unbound(conf):
+        nt = tempfile.NamedTemporaryFile(suffix='.conf')
+        nt.write(make_config(conf))
+        nt.flush()
+
+        args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % nt.name)
+        time.sleep(1)
+        proc = subprocess.Popen(args)
+        time.sleep(1)
+
+        def finish():
+            proc.terminate()
+            proc.wait()
+            nt.close()
+
+        return finish
+
     def setUp(self):
         module = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             'unbound_ec2.py')
         self.conf = UnboundConf(5003, module)
-
-        self.nt = tempfile.NamedTemporaryFile(suffix='.conf')
-        self.nt.write(make_config(self.conf))
-        self.nt.flush()
-
-        args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % self.nt.name)
-        time.sleep(1)
-        self.proc = subprocess.Popen(args)
-        time.sleep(1)
+        self.unbound_stop = self._start_unbound(self.conf)
 
     def tearDown(self):
-
-        self.proc.terminate()
-        self.proc.wait()
-        self.nt.close()
+        self.unbound_stop()
 
     def _query_ns(self):
         domain = "mwhooker.dev.banksimple.com."
