@@ -1,18 +1,18 @@
-from unittest import TestCase
-import shlex
-import os.path
+from collections import namedtuple
 from dns import resolver, query
-import dns.name
-import dns.message
-import time
+from unittest import TestCase
 
+import dns.message
+import dns.name
+import os.path
+import shlex
 import subprocess
 import tempfile
-
-from contextlib import contextmanager
-from collections import namedtuple
+import time
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
+
+Record = "mwhooker.dev.banksimple.com. 300 IN A 50.18.31.82"
 
 
 def make_config(conf):
@@ -38,11 +38,6 @@ python:
 """
     return tpl.format(conf=conf)
 
-@contextmanager
-def unbound(conf):
-        yield
-
-
 class TestBadNetword(TestCase):
 
     def setUp(self):
@@ -50,14 +45,12 @@ class TestBadNetword(TestCase):
             os.path.dirname(os.path.dirname(__file__)),
             'unbound_ec2.py')
         self.conf = UnboundConf(5003, module)
-        print make_config(self.conf)
 
         self.nt = tempfile.NamedTemporaryFile(suffix='.conf')
         self.nt.write(make_config(self.conf))
         self.nt.flush()
 
         args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % self.nt.name)
-        print " ".join(args)
         time.sleep(1)
         self.proc = subprocess.Popen(args)
         time.sleep(1)
@@ -68,19 +61,20 @@ class TestBadNetword(TestCase):
         self.proc.wait()
         self.nt.close()
 
-
-    def test_normal(self):
-        # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
-
+    def _query_ns(self):
         domain = "mwhooker.dev.banksimple.com."
         domain = dns.name.from_text(domain)
         if not domain.is_absolute():
             domain = domain.concatenate(dns.name.root)
         request = dns.message.make_query(domain, dns.rdatatype.ANY)
 
-        result = query.tcp(
+        return query.tcp(
             request, where='127.0.0.1',
             port=self.conf.port)
-        print result
 
-        self.assertTrue(len(result.answer[0]) > 0)
+    def test_normal(self):
+        # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
+        result = self._query_ns()
+
+        self.assertTrue(len(result.answer) == 1)
+        self.assertEquals(result.answer[0].to_text(), Record)
