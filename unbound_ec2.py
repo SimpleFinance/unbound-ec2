@@ -21,7 +21,7 @@ import os
 import random
 
 import boto.ec2
-import boto.https_connection as https
+from boto.ec2.connection import EC2Connection
 
 from boto import config
 
@@ -37,11 +37,16 @@ def init(id_, cfg):
     global TTL
     global ec2
 
+    #boto.ec2.RegionData['proxy'] = 'localhost:8000'
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "300"))
+    testing = os.environ.get('UNBOUND_DEBUG') == "1"
 
-    ec2 = boto.ec2.connect_to_region(aws_region)
+    print testing
+    #ec2 = boto.ec2.connect_to_region(aws_region)
+    ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
+                        is_secure=not testing)
 
     if not ZONE.endswith("."):
         ZONE += "."

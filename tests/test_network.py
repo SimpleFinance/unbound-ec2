@@ -52,8 +52,13 @@ class TestBadNetword(TestCase):
 
         args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % nt.name)
         time.sleep(1)
-        #proc = subprocess.Popen(args, env={'AWS_REGION': 'proxy'})
-        proc = subprocess.Popen(args)
+        testenv = os.environ.copy()
+        testenv.update({
+            'AWS_REGION': 'proxy',
+            'http_proxy': 'localhost:8000',
+            'UNBOUND_DEBUG': "1"
+        })
+        proc = subprocess.Popen(args, env=testenv)
         time.sleep(1)
 
         @atexit.register
@@ -72,7 +77,6 @@ class TestBadNetword(TestCase):
         return finish
 
     def setUp(self):
-        boto.ec2.RegionData['proxy'] = 'localhost:8000'
 
         module = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
