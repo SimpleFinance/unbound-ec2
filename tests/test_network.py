@@ -42,7 +42,7 @@ python:
 """
     return tpl.format(conf=conf)
 
-class TestBadNetword(TestCase):
+class TestBadNetwork(TestCase):
 
     @staticmethod
     def _start_unbound(conf):
