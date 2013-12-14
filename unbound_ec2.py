@@ -61,6 +61,18 @@ def deinit(id_): return True
 def inform_super(id_, qstate, superqstate, qdata): return True
 
 def operate(id_, event, qstate, qdata):
+    """
+    Perform action on pending query. Accepts a new query, or work on pending
+    query.
+
+    You have to set qstate.ext_state on exit. The state informs unbound about result
+    and controls the following states.
+
+    Parameters:
+        id – module identifier (integer)
+        qstate – module_qstate query state structure
+        qdata – query_info per query data, here you can store your own dat
+    """
     global ZONE
 
     if (event == MODULE_EVENT_NEW) or (event == MODULE_EVENT_PASS):
@@ -70,7 +82,7 @@ def operate(id_, event, qstate, qdata):
                 ec2_log("handling forward query for %s" % qname)
                 return handle_forward(id_, event, qstate, qdata)
 
-        # Fall through; pass on this request.
+        # Fall through; pass on this rquest.
         return handle_pass(id_, event, qstate, qdata)
 
     if event == MODULE_EVENT_MODDONE:
@@ -107,7 +119,9 @@ def handle_forward(id_, event, qstate, qdata):
         return True
 
     qstate.return_msg.rep.security = 2
-    qstate.ext_state[id_] = MODULE_FINISHED
+    qstate.ext_state[id] = MODULE_FINISHED
+    if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg, 0):
+        log_warn("Unable to store query in cache. possibly out of memory.")
     return True
 
 def handle_pass(id_, event, qstate, qdata):
