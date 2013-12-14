@@ -78,12 +78,6 @@ def operate(id_, event, qstate, qdata):
 
     return handle_error(id_, event, qstate, qdata)
 
-
-def determine_address(instance):
-    return (instance.tags.get('Address')
-            or instance.ip_address
-            or instance.private_ip_address).encode("ascii")
-
 def handle_forward(id_, event, qstate, qdata):
     global TTL
 
@@ -128,3 +122,8 @@ def handle_error(id_, event, qstate, qdata):
     ec2_log("bad event")
     qstate.ext_state[id_] = MODULE_ERROR
     return True
+
+def determine_address(instance):
+    return (instance.tags.get('Address')
+            or instance.ip_address
+            or instance.private_ip_address).encode("ascii")
