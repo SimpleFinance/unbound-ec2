@@ -43,7 +43,6 @@ def init(id_, cfg):
     TTL = int(os.environ.get("TTL", "300"))
     testing = os.environ.get('UNBOUND_DEBUG') == "1"
 
-    print testing
     #ec2 = boto.ec2.connect_to_region(aws_region)
     ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
                         is_secure=not testing)
@@ -119,9 +118,11 @@ def handle_forward(id_, event, qstate, qdata):
         return True
 
     qstate.return_msg.rep.security = 2
-    qstate.ext_state[id] = MODULE_FINISHED
+    qstate.ext_state[id_] = MODULE_FINISHED
+    """
     if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg, 0):
         log_warn("Unable to store query in cache. possibly out of memory.")
+    """
     return True
 
 def handle_pass(id_, event, qstate, qdata):
