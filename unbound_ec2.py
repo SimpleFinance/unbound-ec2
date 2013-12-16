@@ -25,6 +25,36 @@ from boto.ec2.connection import EC2Connection
 
 from boto import config
 
+
+
+import sched
+import heapq
+from collections import namedtuple
+class RequestQueue(object):
+    Item = namedtuple('Item', ('priority', 'item'))
+
+    def __init__(self):
+        self.heap = []
+
+    def put(self, name):
+        """Add with priority 0 (lowest).
+
+        if `name` already exists, increment priority.
+        """
+        for i, item in enumerate(self.heap):
+            if item.item == name:
+                self.heap[i].priority -= 1
+                heapq.heapify(self.heap)
+                return
+        heapq.heappush(self.heap, self.Item(0, name))
+
+    def remove(self, name):
+        """Remove from queue."""
+        for i, item in enumerate(self.heap):
+            if item.item == name:
+                self.heap.pop(i)
+                break
+
 ZONE = None
 TTL = None
 ec2 = None
