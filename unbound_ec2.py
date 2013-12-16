@@ -27,34 +27,6 @@ from boto import config
 
 
 
-import sched
-import heapq
-from collections import namedtuple
-class RequestQueue(object):
-    Item = namedtuple('Item', ('priority', 'item'))
-
-    def __init__(self):
-        self.heap = []
-
-    def put(self, name):
-        """Add with priority 0 (lowest).
-
-        if `name` already exists, increment priority.
-        """
-        for i, item in enumerate(self.heap):
-            if item.item == name:
-                self.heap[i].priority -= 1
-                heapq.heapify(self.heap)
-                return
-        heapq.heappush(self.heap, self.Item(0, name))
-
-    def remove(self, name):
-        """Remove from queue."""
-        for i, item in enumerate(self.heap):
-            if item.item == name:
-                self.heap.pop(i)
-                break
-
 ZONE = None
 TTL = None
 ec2 = None
@@ -70,7 +42,7 @@ def init(id_, cfg):
     #boto.ec2.RegionData['proxy'] = 'localhost:8000'
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
-    TTL = int(os.environ.get("TTL", "300"))
+    TTL = int(os.environ.get("TTL", "3600"))
     testing = os.environ.get('UNBOUND_DEBUG') == "1"
 
     #ec2 = boto.ec2.connect_to_region(aws_region)
@@ -123,7 +95,7 @@ def handle_forward(id_, event, qstate, qdata):
     global TTL
 
     qname = qstate.qinfo.qname_str
-    msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA | PKT_AA)
+    msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
 
     reservations = ec2.get_all_instances(filters={
         "instance-state-name": "running",
@@ -149,10 +121,8 @@ def handle_forward(id_, event, qstate, qdata):
 
     qstate.return_msg.rep.security = 2
     qstate.ext_state[id_] = MODULE_FINISHED
-    """
-    if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg, 0):
+    if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg.rep, 0):
         log_warn("Unable to store query in cache. possibly out of memory.")
-    """
     return True
 
 def handle_pass(id_, event, qstate, qdata):

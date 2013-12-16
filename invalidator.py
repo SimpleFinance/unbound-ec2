@@ -5,12 +5,14 @@ import heapq
 from collections import defaultdict, namedtuple
 import threading
 import time
+
+
 class RequestScheduler(object):
     History = namedtuple('History', ('first_request', 'requests'))
 
     def __init__(self, ratio):
         """
-        ratio: requests / age = 1.
+        ratio: age * ratio = 1 request
         """
         self.request_history = defaultdict(
             lambda: self.History(time.time(), 0))
@@ -29,20 +31,12 @@ class RequestScheduler(object):
         >>> "foo" in rq
         False
         """
-        
+
         with self._history_lock:
-            _, name = max([(self.priority(v), k) for (k, v) in
-                               self.request_history.items()])
+            _, name = max((self.priority(v), k) for (k, v) in
+                               self.request_history.items())
             del self.request_history[name]
             return name
-
-
-    def _age(self, time):
-        """calculate the age of a given time."""
-        return time.time() - time
-
-    def __contains__(self, value):
-        return value in self.request_history
 
     def priority(self, history):
         """requests + (ratio * age)
@@ -60,5 +54,17 @@ class RequestScheduler(object):
     def mark(self, name):
         """Mark name as having been requested."""
         with self._history_lock:
-            t, p = self.request_history[name]
-            self.request_history[name] = self.History(t, p+1)
+            event_time, priority = self.request_history[name]
+            self.request_history[name] = self.History(event_time, priority+1)
+
+    @staticmethod
+    def _age(event_time):
+        """calculate the age of a given time."""
+        return time.time() - event_time
+
+    def __contains__(self, value):
+        return value in self.request_history
+
+
+class InvalidatorScheduler(object):
+    pass

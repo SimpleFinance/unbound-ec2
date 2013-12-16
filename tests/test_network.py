@@ -92,6 +92,7 @@ class TestBadNetwork(TestCase):
         # --http-host localhost --http-port 8080 --protocol-tcp-reuse-socket
         # --protocol-tcp-keep-alive
         self.proxy_pid = start_proxy(
+            protocol='http',
             proxy_port=8000,
             backend_host=boto.ec2.RegionData['us-west-1'],
             backend_port=80,
@@ -135,11 +136,11 @@ class TestBadNetwork(TestCase):
             self._test_result(result)
 
     #def test_under_partition(self):
-    def test_aws_5xx(self):
-        client = VClient()
-        options = {'inject': True}
+    # def test_aws_5xx(self):
+    #     client = VClient()
+    #     options = {'inject': True}
 
-        with client.with_behavior('error', **options):
-            # do something...
-            result = self._query_ns()
-            self._test_result(result)
+    #     with client.with_behavior('error', **options):
+    #         # do something...
+    #         result = self._query_ns()
+    #         self._test_result(result)
