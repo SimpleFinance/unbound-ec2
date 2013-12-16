@@ -18,13 +18,36 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
 import os
+import time
 import random
 
 import boto.ec2
 from boto.ec2.connection import EC2Connection
 
 from boto import config
+from Queue import PriorityQueue
 
+
+class RequestHistory(object):
+    def __init__(self, maxsize=1000):
+        self._queue = PriorityQueue(maxsize)
+
+    def put(self, qstate):
+        self._queue.put((time.time(), qstate), False)
+
+    def get(self):
+        return self._queue.get()
+
+
+def invalidate(q):
+    while True:
+        qstate = q.get()
+        invalidateQueryInCache(qstate, qstate.qinfo)
+        q.task_done()
+
+
+
+History = RequestHistory()
 
 
 ZONE = None
@@ -121,6 +144,7 @@ def handle_forward(id_, event, qstate, qdata):
 
     qstate.return_msg.rep.security = 2
     qstate.ext_state[id_] = MODULE_FINISHED
+    History.put(qstate)
     if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg.rep, 0):
         log_warn("Unable to store query in cache. possibly out of memory.")
     return True
