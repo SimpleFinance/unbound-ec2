@@ -21,11 +21,13 @@ import boto.ec2
 import os
 import random
 from boto.ec2.connection import EC2Connection
+from boto.exception import EC2ResponseError
 
 
 ZONE = None
 TTL = None
 ec2 = None
+import logging
 
 def ec2_log(msg):
     log_info("unbound_ec2: %s" % msg)
@@ -35,6 +37,7 @@ def init(id_, cfg):
     global TTL
     global ec2
 
+    logging.getLogger('boto').setLevel(logging.DEBUG)
     #boto.ec2.RegionData['proxy'] = 'localhost:8000'
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
@@ -93,10 +96,15 @@ def handle_forward(id_, event, qstate, qdata):
     qname = qstate.qinfo.qname_str
     msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
 
-    reservations = ec2.get_all_instances(filters={
-        "instance-state-name": "running",
-        "tag:Name": qname.strip("."),
-    })
+    try:
+        reservations = ec2.get_all_instances(filters={
+            "instance-state-name": "running",
+            "tag:Name": qname.strip("."),
+        })
+    except EC2ResponseError:
+        qstate.ext_state[id_] = MODULE_ERROR
+        return True
+
     instances = [instance for reservation in reservations
                  for instance in reservation.instances]
 

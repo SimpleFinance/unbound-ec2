@@ -90,7 +90,7 @@ class TestBadNetwork(TestCase):
         self.unbound_stop()
         stop_proxy(self.proxy_pid)
 
-    def _setup_proxy(self, protocol='http'):
+    def _setup_proxy(self, protocol='http', options=None):
         # vaurien --protocol tcp --proxy localhost:8888 --backend
         # ec2.us-west-2.amazonaws.com:80 --log-level debug --protocol-tcp-reuse-socket
         # --protocol-tcp-keep-alive
@@ -99,6 +99,8 @@ class TestBadNetwork(TestCase):
         # localhost:8000 --log-level info --log-output - --protocol tcp --http
         # --http-host localhost --http-port 8080 --protocol-tcp-reuse-socket
         # --protocol-tcp-keep-alive
+        if not options:
+            options = []
         self.proxy_pid = start_proxy(
             protocol=protocol,
             proxy_port=8000,
@@ -107,7 +109,7 @@ class TestBadNetwork(TestCase):
             options=[
                 '--protocol-tcp-reuse-socket',
                 '--protocol-tcp-keep-alive'
-            ]
+            ] + options
         )
         assert self.proxy_pid is not None
 
@@ -156,14 +158,11 @@ class TestBadNetwork(TestCase):
 
     def test_aws_transient(self):
         """Tests that we retry requests."""
-        self._setup_proxy()
+        self._setup_proxy(options=['--behavior-error-warmup', '1'])
         client = VClient()
-        options = {
-            'inject': True,
-            'warmup': 2
-        }
 
-        with client.with_behavior('error', **options):
+        with client.with_behavior('error'):
+            time.sleep(1)
             # do something...
             result = self._query_ns()
             self._test_result(result)
