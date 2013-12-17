@@ -16,7 +16,7 @@ import atexit
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
-GoodRecord = "mwhooker.dev.banksimple.com. 300 IN A 50.18.31.82"
+GoodRecord = "mwhooker.dev.banksimple.com. 3600 IN A 50.18.31.82"
 
 
 def make_config(conf):
@@ -83,6 +83,13 @@ class TestBadNetwork(TestCase):
             'unbound_ec2.py')
         self.conf = UnboundConf(5003, module)
 
+        self.unbound_stop = self._start_unbound(self.conf)
+
+    def tearDown(self):
+        self.unbound_stop()
+        stop_proxy(self.proxy_pid)
+
+    def _setup_proxy(self, protocol='http'):
         # vaurien --protocol tcp --proxy localhost:8888 --backend
         # ec2.us-west-2.amazonaws.com:80 --log-level debug --protocol-tcp-reuse-socket
         # --protocol-tcp-keep-alive
@@ -92,7 +99,7 @@ class TestBadNetwork(TestCase):
         # --http-host localhost --http-port 8080 --protocol-tcp-reuse-socket
         # --protocol-tcp-keep-alive
         self.proxy_pid = start_proxy(
-            protocol='http',
+            protocol=protocol,
             proxy_port=8000,
             backend_host=boto.ec2.RegionData['us-west-1'],
             backend_port=80,
@@ -102,12 +109,6 @@ class TestBadNetwork(TestCase):
             ]
         )
         assert self.proxy_pid is not None
-        self.unbound_stop = self._start_unbound(self.conf)
-
-
-    def tearDown(self):
-        self.unbound_stop()
-        stop_proxy(self.proxy_pid)
 
     def _query_ns(self):
         domain = "mwhooker.dev.banksimple.com."
@@ -128,6 +129,7 @@ class TestBadNetwork(TestCase):
 
     def test_normal(self):
         # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
+        self._setup_proxy()
         client = VClient()
 
         with client.with_behavior('dummy'):
@@ -136,11 +138,15 @@ class TestBadNetwork(TestCase):
             self._test_result(result)
 
     #def test_under_partition(self):
-    # def test_aws_5xx(self):
-    #     client = VClient()
-    #     options = {'inject': True}
+    def test_aws_5xx(self):
+        self._setup_proxy()
+        client = VClient()
+        options = {
+            'inject': True
+        }
 
-    #     with client.with_behavior('error', **options):
-    #         # do something...
-    #         result = self._query_ns()
-    #         self._test_result(result)
+        result = self._query_ns()
+        with client.with_behavior('error', **options):
+            # do something...
+            result = self._query_ns()
+            self._test_result(result)
