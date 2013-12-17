@@ -1,10 +1,11 @@
 from collections import namedtuple
 from dns import resolver, query
 from unittest import TestCase
-
 from vaurien.util import start_proxy, stop_proxy
 from vaurienclient import Client as VClient
-import vaurien.behaviors.error
+
+import atexit
+import boto.ec2
 import dns.message
 import dns.name
 import os.path
@@ -12,17 +13,14 @@ import shlex
 import subprocess
 import tempfile
 import time
-import boto.ec2
-import atexit
+import vaurien.behaviors.error
+
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
-
-GoodRecord = "mwhooker.dev.banksimple.com. 3600 IN A 50.18.31.82"
 
 # boto doesn't retry 501s
 del vaurien.behaviors.error._ERRORS[501]
 vaurien.behaviors.error._ERROR_CODES = vaurien.behaviors.error._ERRORS.keys()
-
 
 
 def make_config(conf):
@@ -62,7 +60,7 @@ class TestBadNetwork(TestCase):
         testenv.update({
             'AWS_REGION': 'proxy',
             'http_proxy': 'localhost:8000',
-            'UNBOUND_DEBUG': "1"
+            'UNBOUND_DEBUG': "true"
         })
         proc = subprocess.Popen(args, env=testenv)
         time.sleep(1)
@@ -137,7 +135,6 @@ class TestBadNetwork(TestCase):
             result.answer[0].to_text(), 
             "%s \d+ IN A \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}" % self.domain
         )
-        #self.assertEquals(result.answer[0].to_text(), GoodRecord)
 
     def test_normal(self):
         # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
@@ -145,7 +142,6 @@ class TestBadNetwork(TestCase):
         client = VClient()
 
         with client.with_behavior('dummy'):
-            # do something...
             result = self._query_ns()
             self._test_result(result)
 
@@ -160,7 +156,6 @@ class TestBadNetwork(TestCase):
 
         result = self._query_ns()
         with client.with_behavior('error', **options):
-            # do something...
             result = self._query_ns()
             self._test_result(result)
 
@@ -170,7 +165,6 @@ class TestBadNetwork(TestCase):
         client = VClient()
 
         with client.with_behavior('transient'):
-            # do something...
             result = self._query_ns()
             self._test_result(result)
 
@@ -185,6 +179,5 @@ class TestBadNetwork(TestCase):
 
         result = self._query_ns()
         with client.with_behavior('error', **options):
-            # do something...
             result = self._query_ns()
             self._test_result(result)

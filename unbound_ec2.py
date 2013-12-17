@@ -17,24 +17,24 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
-import boto.ec2
-import os
-import random
+from Queue import PriorityQueue
 from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
 
-import boto
-
-ZONE = None
-TTL = None
-ec2 = None
-
-from Queue import PriorityQueue
-import threading
 import Queue
-import time
 import atexit
-import weakref
+import boto
+import boto.ec2
+import os
+import random
+import threading
+import time
+
+
+RecordInvalidator = None
+TTL = None
+ZONE = None
+ec2 = None
 
 
 class Repeater(threading.Thread):
@@ -45,37 +45,41 @@ class Repeater(threading.Thread):
         self.event = threading.Event()
 
     def run(self):
-        while not self.event.is_set():
+        while not self.event.wait(1.0):
             self.callme()
-            time.sleep(self.delay)
-            self.event.wait( 1.0 )
+            self.event.wait(self.delay)
 
     def stop(self):
-        print "STOP!!"
         self.event.set()
+        self.join()
 
 
 class Invalidator(object):
-    Interval = 10
 
-    def __init__(self):
-        self.queue = PriorityQueue()
+    def __init__(self, interval):
+        self.interval = interval
         self._timers = []
-        self.repeater = Repeater(self.Interval, self._worker)
-        atexit.register(self.repeater.stop)
+        self.queue = PriorityQueue()
+        self.repeater = Repeater(self.interval, self._worker)
+        atexit.register(self.stop)
         self.repeater.start()
+
+    def stop(self):
+        self.repeater.stop()
+        self.queue.join()
 
     def request(self, qst, instances):
         """Record a lookup request."""
         self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
 
     def _worker(self):
-        print "working"
-        _, item = self.queue.get()
+        try:
+            _, item = self.queue.get(False)
+        except Queue.Empty:
+            return
         qst, old_instances = item
         instances = lookup_instance_by_name(qst.qinfo.qname_str)
         if set(i.id for i in instances) != old_instances:
-            print "invalidating"
             invalidateQueryInCache(qst, qst.qinfo)
         else:
             self.queue.put((time.time(), (qst, old_instances)), False)
@@ -91,11 +95,6 @@ def lookup_instance_by_name(qname):
                  for instance in reservation.instances]
 
 
-def msg_from_instances(instances):
-    pass
-
-RecordInvalidator = Invalidator()
-
 def ec2_log(msg):
     log_info("unbound_ec2: %s" % msg)
 
@@ -103,11 +102,16 @@ def init(id_, cfg):
     global ZONE
     global TTL
     global ec2
+    global RecordInvalidator
 
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
-    testing = os.environ.get('UNBOUND_DEBUG') == "1"
+    testing = os.environ.get('UNBOUND_DEBUG') == "false"
+    testing = testing == 'true'
+    if not testing:
+        RecordInvalidator = Invalidator(int(
+            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")))
 
     ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
                         is_secure=not testing)
@@ -120,7 +124,10 @@ def init(id_, cfg):
 
     return True
 
-def deinit(id_): return True
+def deinit(id_):
+    if RecordInvalidator:
+        RecordInvalidator.stop()
+    return True
 
 def inform_super(id_, qstate, superqstate, qdata): return True
 
@@ -162,7 +169,7 @@ def handle_forward(id_, event, qstate, qdata):
 
     try:
         instances = lookup_instance_by_name(qname)
-    except Exception:
+    except EC2ResponseError:
         ec2_log("Error connecting to ec2.")
         qstate.ext_state[id_] = MODULE_ERROR
         return True
@@ -188,7 +195,8 @@ def handle_forward(id_, event, qstate, qdata):
         log_warn("Unable to store query in cache. possibly out of memory.")
     else:
         try:
-            RecordInvalidator.request(qstate, instances)
+            if RecordInvalidator:
+                RecordInvalidator.request(qstate, instances)
         except Queue.Full:
             log_warn("Invalidator Queue is full!")
     return True
