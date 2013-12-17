@@ -137,7 +137,19 @@ class TestBadNetwork(TestCase):
             result = self._query_ns()
             self._test_result(result)
 
-    #def test_under_partition(self):
+    def test_under_partition(self):
+        self._setup_proxy(protocol='tcp')
+        client = VClient()
+        options = {
+            'inject': True
+        }
+
+        result = self._query_ns()
+        with client.with_behavior('error', **options):
+            # do something...
+            result = self._query_ns()
+            self._test_result(result)
+
     def test_aws_5xx(self):
         self._setup_proxy()
         client = VClient()
