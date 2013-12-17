@@ -28,7 +28,73 @@ import boto
 ZONE = None
 TTL = None
 ec2 = None
-import logging
+
+from Queue import PriorityQueue
+import threading
+import Queue
+import time
+import atexit
+import weakref
+
+
+class Repeater(threading.Thread):
+    def __init__(self, delay, callme):
+        threading.Thread.__init__(self)
+        self.callme = callme
+        self.delay = delay
+        self.event = threading.Event()
+
+    def run(self):
+        while not self.event.is_set():
+            self.callme()
+            time.sleep(self.delay)
+            self.event.wait( 1.0 )
+
+    def stop(self):
+        print "STOP!!"
+        self.event.set()
+
+
+class Invalidator(object):
+    Interval = 10
+
+    def __init__(self):
+        self.queue = PriorityQueue()
+        self._timers = []
+        self.repeater = Repeater(self.Interval, self._worker)
+        atexit.register(self.repeater.stop)
+        self.repeater.start()
+
+    def request(self, qst, instances):
+        """Record a lookup request."""
+        self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
+
+    def _worker(self):
+        print "working"
+        _, item = self.queue.get()
+        qst, old_instances = item
+        instances = lookup_instance_by_name(qst.qinfo.qname_str)
+        if set(i.id for i in instances) != old_instances:
+            print "invalidating"
+            invalidateQueryInCache(qst, qst.qinfo)
+        else:
+            self.queue.put((time.time(), (qst, old_instances)), False)
+        self.queue.task_done()
+
+def lookup_instance_by_name(qname):
+    reservations = ec2.get_all_instances(filters={
+        "instance-state-name": "running",
+        "tag:Name": qname.strip("."),
+    })
+
+    return [instance for reservation in reservations
+                 for instance in reservation.instances]
+
+
+def msg_from_instances(instances):
+    pass
+
+RecordInvalidator = Invalidator()
 
 def ec2_log(msg):
     log_info("unbound_ec2: %s" % msg)
@@ -95,17 +161,11 @@ def handle_forward(id_, event, qstate, qdata):
     msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
 
     try:
-        reservations = ec2.get_all_instances(filters={
-            "instance-state-name": "running",
-            "tag:Name": qname.strip("."),
-        })
-    except EC2ResponseError:
+        instances = lookup_instance_by_name(qname)
+    except Exception:
         ec2_log("Error connecting to ec2.")
         qstate.ext_state[id_] = MODULE_ERROR
         return True
-
-    instances = [instance for reservation in reservations
-                 for instance in reservation.instances]
 
     if len(instances) == 0:
         ec2_log("no results found")
@@ -126,6 +186,11 @@ def handle_forward(id_, event, qstate, qdata):
     qstate.ext_state[id_] = MODULE_FINISHED
     if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg.rep, 0):
         log_warn("Unable to store query in cache. possibly out of memory.")
+    else:
+        try:
+            RecordInvalidator.request(qstate, instances)
+        except Queue.Full:
+            log_warn("Invalidator Queue is full!")
     return True
 
 def handle_pass(id_, event, qstate, qdata):

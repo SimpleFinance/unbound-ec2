@@ -24,6 +24,7 @@ del vaurien.behaviors.error._ERRORS[501]
 vaurien.behaviors.error._ERROR_CODES = vaurien.behaviors.error._ERRORS.keys()
 
 
+
 def make_config(conf):
     tpl = """
 server:
