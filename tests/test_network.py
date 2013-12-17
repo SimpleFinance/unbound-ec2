@@ -78,6 +78,7 @@ class TestBadNetwork(TestCase):
 
     def setUp(self):
 
+        self.domain = "mwhooker.dev.banksimple.com."
         module = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             'unbound_ec2.py')
@@ -111,8 +112,7 @@ class TestBadNetwork(TestCase):
         assert self.proxy_pid is not None
 
     def _query_ns(self):
-        domain = "mwhooker.dev.banksimple.com."
-        domain = dns.name.from_text(domain)
+        domain = dns.name.from_text(self.domain)
         if not domain.is_absolute():
             domain = domain.concatenate(dns.name.root)
         request = dns.message.make_query(domain, dns.rdatatype.ANY)
@@ -125,7 +125,11 @@ class TestBadNetwork(TestCase):
 
     def _test_result(self, result):
         self.assertTrue(len(result.answer) == 1)
-        self.assertEquals(result.answer[0].to_text(), GoodRecord)
+        self.assertRegexpMatches(
+            result.answer[0].to_text(), 
+            "%s \d+ IN A \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}" % self.domain
+        )
+        #self.assertEquals(result.answer[0].to_text(), GoodRecord)
 
     def test_normal(self):
         # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
@@ -145,6 +149,20 @@ class TestBadNetwork(TestCase):
         }
 
         result = self._query_ns()
+        with client.with_behavior('error', **options):
+            # do something...
+            result = self._query_ns()
+            self._test_result(result)
+
+    def test_aws_transient(self):
+        """Tests that we retry requests."""
+        self._setup_proxy()
+        client = VClient()
+        options = {
+            'inject': True,
+            'warmup': 2
+        }
+
         with client.with_behavior('error', **options):
             # do something...
             result = self._query_ns()
