@@ -107,8 +107,7 @@ def init(id_, cfg):
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
-    testing = os.environ.get('UNBOUND_DEBUG') == "false"
-    testing = testing == 'true'
+    testing = os.environ.get('UNBOUND_DEBUG') == "true"
     if not testing:
         RecordInvalidator = Invalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")))
