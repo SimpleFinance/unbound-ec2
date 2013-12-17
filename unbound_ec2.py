@@ -23,6 +23,7 @@ import random
 from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
 
+import boto
 
 ZONE = None
 TTL = None
@@ -37,14 +38,11 @@ def init(id_, cfg):
     global TTL
     global ec2
 
-    logging.getLogger('boto').setLevel(logging.DEBUG)
-    #boto.ec2.RegionData['proxy'] = 'localhost:8000'
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
     testing = os.environ.get('UNBOUND_DEBUG') == "1"
 
-    #ec2 = boto.ec2.connect_to_region(aws_region)
     ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
                         is_secure=not testing)
 
@@ -102,6 +100,7 @@ def handle_forward(id_, event, qstate, qdata):
             "tag:Name": qname.strip("."),
         })
     except EC2ResponseError:
+        ec2_log("Error connecting to ec2.")
         qstate.ext_state[id_] = MODULE_ERROR
         return True
 

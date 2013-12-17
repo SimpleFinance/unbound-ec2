@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from vaurien.util import start_proxy, stop_proxy
 from vaurienclient import Client as VClient
+import vaurien.behaviors.error
 import dns.message
 import dns.name
 import os.path
@@ -17,6 +18,10 @@ import atexit
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
 GoodRecord = "mwhooker.dev.banksimple.com. 3600 IN A 50.18.31.82"
+
+# boto doesn't retry 501s
+del vaurien.behaviors.error._ERRORS[501]
+vaurien.behaviors.error._ERROR_CODES = vaurien.behaviors.error._ERRORS.keys()
 
 
 def make_config(conf):
@@ -144,6 +149,8 @@ class TestBadNetwork(TestCase):
             self._test_result(result)
 
     def test_under_partition(self):
+        """Test that we succeed on network errors
+        if we have a cached result."""
         self._setup_proxy(protocol='tcp')
         client = VClient()
         options = {
@@ -158,16 +165,17 @@ class TestBadNetwork(TestCase):
 
     def test_aws_transient(self):
         """Tests that we retry requests."""
-        self._setup_proxy(options=['--behavior-error-warmup', '1'])
+        self._setup_proxy()
         client = VClient()
 
-        with client.with_behavior('error'):
-            time.sleep(1)
+        with client.with_behavior('transient'):
             # do something...
             result = self._query_ns()
             self._test_result(result)
 
     def test_aws_5xx(self):
+        """test that we succeed on 5xx errors if we have a cached
+        result."""
         self._setup_proxy()
         client = VClient()
         options = {
