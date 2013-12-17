@@ -17,96 +17,164 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 """
 
+from Queue import PriorityQueue
+from boto.ec2.connection import EC2Connection
+from boto.exception import EC2ResponseError
+
+import Queue
+import atexit
+import boto
+import boto.ec2
 import os
 import random
+import threading
+import time
 
-import boto.ec2
-import boto.https_connection as https
 
-from boto import config
-
-EC2_ENDPOINT = None
-EC2_ENDPOINT_ADDRESS = None
-ZONE = None
+RecordInvalidator = None
 TTL = None
+ZONE = None
 ec2 = None
 
-def init(id, cfg):
-    global EC2_ENDPOINT
-    global EC2_ENDPOINT_ADDRESS
+
+class Repeater(threading.Thread):
+    def __init__(self, delay, callme):
+        threading.Thread.__init__(self)
+        self.callme = callme
+        self.delay = delay
+        self.event = threading.Event()
+
+    def run(self):
+        while not self.event.wait(1.0):
+            self.callme()
+            self.event.wait(self.delay)
+
+    def stop(self):
+        self.event.set()
+        self.join()
+
+
+class Invalidator(object):
+
+    def __init__(self, interval):
+        self.interval = interval
+        self._timers = []
+        self.queue = PriorityQueue()
+        self.repeater = Repeater(self.interval, self._worker)
+        atexit.register(self.stop)
+        self.repeater.start()
+
+    def stop(self):
+        self.repeater.stop()
+        self.queue.join()
+
+    def request(self, qst, instances):
+        """Record a lookup request."""
+        self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
+
+    def _worker(self):
+        try:
+            _, item = self.queue.get(False)
+        except Queue.Empty:
+            return
+        qst, old_instances = item
+        instances = lookup_instance_by_name(qst.qinfo.qname_str)
+        if set(i.id for i in instances) != old_instances:
+            invalidateQueryInCache(qst, qst.qinfo)
+        else:
+            self.queue.put((time.time(), (qst, old_instances)), False)
+        self.queue.task_done()
+
+def lookup_instance_by_name(qname):
+    reservations = ec2.get_all_instances(filters={
+        "instance-state-name": "running",
+        "tag:Name": qname.strip("."),
+    })
+
+    return [instance for reservation in reservations
+                 for instance in reservation.instances]
+
+
+def ec2_log(msg):
+    log_info("unbound_ec2: %s" % msg)
+
+def init(id_, cfg):
     global ZONE
     global TTL
     global ec2
+    global RecordInvalidator
 
-    EC2_ENDPOINT = os.environ.get("EC2_ENDPOINT", "ec2.us-east-1.amazonaws.com").encode("ascii")
-    EC2_ENDPOINT_ADDRESS = os.environ.get("EC2_ENDPOINT_ADDRESS", "").encode("ascii")
-    AWS_REGION = os.environ.get("AWS_REGION", "us-east-1").encode("ascii")
-    ZONE = os.environ.get("ZONE", ".example.com.").encode("ascii")
-    TTL = int(os.environ.get("TTL", "300"))
+    aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
+    ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
+    TTL = int(os.environ.get("TTL", "3600"))
+    testing = os.environ.get('UNBOUND_DEBUG') == "true"
+    if not testing:
+        RecordInvalidator = Invalidator(int(
+            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")))
 
-    ca_certificates_file = config.get_value(
-        'Boto',
-        'ca_certificates_file',
-        boto.connection.DEFAULT_CA_CERTS_FILE
-    )
-
-    ec2 = connect_to_ec2(
-        endpoint=EC2_ENDPOINT,
-        address=EC2_ENDPOINT_ADDRESS,
-        ca_certificates_file=ca_certificates_file,
-    )
+    ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
+                        is_secure=not testing)
 
     if not ZONE.endswith("."):
         ZONE += "."
 
-    log_info("unbound_ec2: connected to EC2 endpoint %s" % EC2_ENDPOINT)
-    log_info("unbound_ec2: authoritative for zone %s" % ZONE)
+    ec2_log("connected to aws region %s" % aws_region)
+    ec2_log("authoritative for zone %s" % ZONE)
 
     return True
 
-def deinit(id): return True
+def deinit(id_):
+    if RecordInvalidator:
+        RecordInvalidator.stop()
+    return True
 
-def inform_super(id, qstate, superqstate, qdata): return True
+def inform_super(id_, qstate, superqstate, qdata): return True
 
-def operate(id, event, qstate, qdata):
+def operate(id_, event, qstate, qdata):
+    """
+    Perform action on pending query. Accepts a new query, or work on pending
+    query.
+
+    You have to set qstate.ext_state on exit. The state informs unbound about result
+    and controls the following states.
+
+    Parameters:
+        id – module identifier (integer)
+        qstate – module_qstate query state structure
+        qdata – query_info per query data, here you can store your own dat
+    """
     global ZONE
 
     if (event == MODULE_EVENT_NEW) or (event == MODULE_EVENT_PASS):
         if (qstate.qinfo.qtype == RR_TYPE_A) or (qstate.qinfo.qtype == RR_TYPE_ANY):
             qname = qstate.qinfo.qname_str
             if qname.endswith(ZONE):
-                log_info("unbound_ec2: handling forward query for %s" % qname)
-                return handle_forward(id, event, qstate, qdata)
+                ec2_log("handling forward query for %s" % qname)
+                return handle_forward(id_, event, qstate, qdata)
 
-        # Fall through; pass on this request.
-        return handle_pass(id, event, qstate, qdata)
+        # Fall through; pass on this rquest.
+        return handle_pass(id_, event, qstate, qdata)
 
     if event == MODULE_EVENT_MODDONE:
-        return handle_finished(id, event, qstate, qdata)
+        return handle_finished(id_, event, qstate, qdata)
 
-    return handle_error(id, event, qstate, qdata)
+    return handle_error(id_, event, qstate, qdata)
 
-
-def determine_address(instance):
-    return (instance.tags.get('Address')
-            or instance.ip_address
-            or instance.private_ip_address).encode("ascii")
-
-
-def handle_forward(id, event, qstate, qdata):
+def handle_forward(id_, event, qstate, qdata):
     global TTL
 
     qname = qstate.qinfo.qname_str
-    msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA | PKT_AA)
+    msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
 
-    reservations = ec2.get_all_instances(filters={
-        "instance-state-name": "running",
-        "tag:Name": qname.strip("."),
-    })
-    instances = [instance for reservation in reservations
-                 for instance in reservation.instances]
+    try:
+        instances = lookup_instance_by_name(qname)
+    except EC2ResponseError:
+        ec2_log("Error connecting to ec2.")
+        qstate.ext_state[id_] = MODULE_ERROR
+        return True
 
     if len(instances) == 0:
+        ec2_log("no results found")
         qstate.return_rcode = RCODE_NXDOMAIN
     else:
         qstate.return_rcode = RCODE_NOERROR
@@ -117,69 +185,35 @@ def handle_forward(id, event, qstate, qdata):
             msg.answer.append(record)
 
     if not msg.set_return_msg(qstate):
-        qstate.ext_state[id] = MODULE_ERROR
+        qstate.ext_state[id_] = MODULE_ERROR
         return True
 
     qstate.return_msg.rep.security = 2
-    qstate.ext_state[id] = MODULE_FINISHED
-    return True
-
-def handle_pass(id, event, qstate, qdata):
-    qstate.ext_state[id] = MODULE_WAIT_MODULE
-    return True
-
-def handle_finished(id, event, qstate, qdata):
-    qstate.ext_state[id] = MODULE_FINISHED
-    return True
-
-def handle_error(id, event, qstate, qdata):
-    log_err("unbound_ec2: bad event")
-    qstate.ext_state[id] = MODULE_ERROR
-    return True
-
-
-class Connection(https.CertValidatingHTTPSConnection):
-    """An EC2 connection.
-
-    This implementation supports odd cases where `host` is the correct
-    name (or address) for the server but another name should be used to
-    validate the server's certificate. Then, `hostname` is used
-    instead. This is necessary when `host` is an IP address.
-    """
-
-    def __init__(self,
-                 host,
-                 hostname=None,
-                 **kwargs):
-        self.hostname = hostname
-        https.CertValidatingHTTPSConnection.__init__(self, host, **kwargs)
-
-    def connect(self):
+    qstate.ext_state[id_] = MODULE_FINISHED
+    if not storeQueryInCache(qstate, qstate.qinfo, qstate.return_msg.rep, 0):
+        log_warn("Unable to store query in cache. possibly out of memory.")
+    else:
         try:
-            https.CertValidatingHTTPSConnection.connect(self)
-        except https.InvalidCertificateException, e:
-            if not https.ValidateCertificateHostname(e.cert, self.hostname):
-                raise
+            if RecordInvalidator:
+                RecordInvalidator.request(qstate, instances)
+        except Queue.Full:
+            log_warn("Invalidator Queue is full!")
+    return True
 
-def conn_factory(hostname=None, ca_certificates_file=None):
-    def factory(host, **kwargs):
-        return Connection(
-            host,
-            hostname=hostname,
-            ca_certs=ca_certificates_file,
-            **kwargs)
-    return factory, ()
+def handle_pass(id_, event, qstate, qdata):
+    qstate.ext_state[id_] = MODULE_WAIT_MODULE
+    return True
 
-def connect_to_ec2(endpoint, address=None, ca_certificates_file=None):
-    if not address:
-        address = endpoint
-    region = boto.ec2.RegionInfo(
-        endpoint=address,
-        )
-    return boto.ec2.EC2Connection(
-        region=region,
-        https_connection_factory=conn_factory(
-            hostname=endpoint,
-            ca_certificates_file=ca_certificates_file,
-            ),
-    )
+def handle_finished(id_, event, qstate, qdata):
+    qstate.ext_state[id_] = MODULE_FINISHED
+    return True
+
+def handle_error(id_, event, qstate, qdata):
+    ec2_log("bad event")
+    qstate.ext_state[id_] = MODULE_ERROR
+    return True
+
+def determine_address(instance):
+    return (instance.tags.get('Address')
+            or instance.ip_address
+            or instance.private_ip_address).encode("ascii")
