@@ -166,15 +166,16 @@ def init(id_, cfg):
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
     testing = os.environ.get('UNBOUND_DEBUG') == "true"
-    Ec2Resolver = BatchLookupResolver(ZONE)
+    ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
+                        is_secure=not testing)
+
+    Ec2Resolver = BatchLookupResolver(ec2, ZONE)
     if not testing:
         RecordInvalidator = BatchInvalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
             Ec2Resolver
         )
 
-    ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
-                        is_secure=not testing)
 
     if not ZONE.endswith("."):
         ZONE += "."
