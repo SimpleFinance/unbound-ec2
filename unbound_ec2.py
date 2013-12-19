@@ -81,6 +81,12 @@ class Invalidator(object):
 
     def _worker(self):
         try:
+            self._worker_impl()
+        except Queue.Empty:
+            pass
+
+    def _worker_impl(self):
+        try:
             _, item = self.queue.get(False)
         except Queue.Empty:
             return
@@ -89,13 +95,19 @@ class Invalidator(object):
         if set(i.id for i in instances) != old_instances:
             invalidateQueryInCache(qst, qst.qinfo)
         else:
-            self.queue.put((time.time(), (qst, old_instances)), False)
+            self.queue.put((time.time(), item), False)
         self.queue.task_done()
 
 
 class BatchInvalidator(Invalidator):
     def _worker(self):
-        pass
+        # update instance list.
+        self.resolver.initialize()
+        while True:
+            try:
+                self._worker_impl()
+            except Queue.Empty:
+                return
 
 
 class EC2NameResolver(object):
@@ -114,16 +126,23 @@ class SingleLookupResolver(EC2NameResolver):
 
 class BatchLookupResolver(EC2NameResolver):
     def __init__(self, zone):
+        self.zone = zone
+        self.lookup_by_name = defaultdict(list)
+        self.initialize()
+
+    def initialize(self):
+        """Reload cache with instances."""
+
         reservations = ec2.get_all_instances(filters={
             "instance-state-name": "running",
-            "tag:Name": zone,
+            "tag:Name": self.zone,
         })
 
+        self.lookup_by_name.clear()
         self.instances =  [instance for reservation in reservations
                            for instance in reservation.instances]
-        self.lookup_by_name = defaultdict(list)
         for i in self.instances:
-            self.lookup_by_name[i.tags['Name'].rstrip('.')].append(i) 
+            self.lookup_by_name[i.tags['Name'].rstrip('.')].append(i)
             self.instances_by_id = dict((i.id, i) for i in self.instances)
 
     def __call__(self, name):
