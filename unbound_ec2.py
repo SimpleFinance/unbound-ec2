@@ -20,6 +20,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 from Queue import PriorityQueue
 from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
+from collections import defaultdict
 
 import Queue
 import atexit
@@ -31,6 +32,7 @@ import threading
 import time
 
 
+Ec2Resolver = None
 RecordInvalidator = None
 TTL = None
 ZONE = None
@@ -55,8 +57,13 @@ class Repeater(threading.Thread):
 
 
 class Invalidator(object):
+    """Every N seconds, pop a message off the priority queue and
+    check for any changes to each instance in the message.
+    If there were any changes, invalidate the dns record.
+    """
 
-    def __init__(self, interval):
+    def __init__(self, interval, resolver):
+        self.resolver = resolver
         self.interval = interval
         self._timers = []
         self.queue = PriorityQueue()
@@ -78,21 +85,49 @@ class Invalidator(object):
         except Queue.Empty:
             return
         qst, old_instances = item
-        instances = lookup_instance_by_name(qst.qinfo.qname_str)
+        instances = self.resolver(qst.qinfo.qname_str)
         if set(i.id for i in instances) != old_instances:
             invalidateQueryInCache(qst, qst.qinfo)
         else:
             self.queue.put((time.time(), (qst, old_instances)), False)
         self.queue.task_done()
 
-def lookup_instance_by_name(qname):
-    reservations = ec2.get_all_instances(filters={
-        "instance-state-name": "running",
-        "tag:Name": qname.strip("."),
-    })
 
-    return [instance for reservation in reservations
-                 for instance in reservation.instances]
+class BatchInvalidator(Invalidator):
+    def _worker(self):
+        pass
+
+
+class EC2NameResolver(object):
+    def __call__(self, name):
+        pass
+
+class SingleLookupResolver(EC2NameResolver):
+    def __call__(self, name):
+        reservations = ec2.get_all_instances(filters={
+            "instance-state-name": "running",
+            "tag:Name": name.rstrip("."),
+        })
+
+        return [instance for reservation in reservations
+                     for instance in reservation.instances]
+
+class BatchLookupResolver(EC2NameResolver):
+    def __init__(self, zone):
+        reservations = ec2.get_all_instances(filters={
+            "instance-state-name": "running",
+            "tag:Name": zone,
+        })
+
+        self.instances =  [instance for reservation in reservations
+                           for instance in reservation.instances]
+        self.lookup_by_name = defaultdict(list)
+        for i in self.instances:
+            self.lookup_by_name[i.tags['Name'].rstrip('.')].append(i) 
+            self.instances_by_id = dict((i.id, i) for i in self.instances)
+
+    def __call__(self, name):
+        return self.lookup_by_name[name]
 
 
 def ec2_log(msg):
@@ -103,14 +138,18 @@ def init(id_, cfg):
     global TTL
     global ec2
     global RecordInvalidator
+    global Ec2Resolver
 
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
     testing = os.environ.get('UNBOUND_DEBUG') == "true"
+    Ec2Resolver = SingleLookupResolver()
     if not testing:
         RecordInvalidator = Invalidator(int(
-            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")))
+            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
+            Ec2Resolver
+        )
 
     ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
                         is_secure=not testing)
@@ -167,7 +206,7 @@ def handle_forward(id_, event, qstate, qdata):
     msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
 
     try:
-        instances = lookup_instance_by_name(qname)
+        instances = Ec2Resolver(qname)
     except EC2ResponseError:
         ec2_log("Error connecting to ec2.")
         qstate.ext_state[id_] = MODULE_ERROR
