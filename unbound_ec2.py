@@ -111,12 +111,14 @@ class BatchInvalidator(Invalidator):
 
 
 class EC2NameResolver(object):
+    def __init__(self, ec2):
+        self.ec2 = ec2
     def __call__(self, name):
         pass
 
 class SingleLookupResolver(EC2NameResolver):
     def __call__(self, name):
-        reservations = ec2.get_all_instances(filters={
+        reservations = self.ec2.get_all_instances(filters={
             "instance-state-name": "running",
             "tag:Name": name.rstrip("."),
         })
@@ -125,7 +127,8 @@ class SingleLookupResolver(EC2NameResolver):
                      for instance in reservation.instances]
 
 class BatchLookupResolver(EC2NameResolver):
-    def __init__(self, zone):
+    def __init__(self, ec2, zone):
+        super(BatchLookupResolver, self).__init__(ec2)
         self.zone = zone
         self.lookup_by_name = defaultdict(list)
         self.initialize()
@@ -133,7 +136,7 @@ class BatchLookupResolver(EC2NameResolver):
     def initialize(self):
         """Reload cache with instances."""
 
-        reservations = ec2.get_all_instances(filters={
+        reservations = self.ec2.get_all_instances(filters={
             "instance-state-name": "running",
             "tag:Name": self.zone,
         })
@@ -163,9 +166,9 @@ def init(id_, cfg):
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
     testing = os.environ.get('UNBOUND_DEBUG') == "true"
-    Ec2Resolver = SingleLookupResolver()
+    Ec2Resolver = BatchLookupResolver(ZONE)
     if not testing:
-        RecordInvalidator = Invalidator(int(
+        RecordInvalidator = BatchInvalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
             Ec2Resolver
         )
