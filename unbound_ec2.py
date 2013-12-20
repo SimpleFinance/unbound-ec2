@@ -91,10 +91,7 @@ class Invalidator(object):
             pass
 
     def _worker_impl(self):
-        try:
-            _, item = self.queue.get(False)
-        except Queue.Empty:
-            return
+        _, item = self.queue.get(False)
         qst, old_instances = item
         instances = self.resolver(qst.qinfo.qname_str)
         if set(i.id for i in instances) != old_instances:
