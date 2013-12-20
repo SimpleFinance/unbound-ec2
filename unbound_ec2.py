@@ -20,7 +20,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 from Queue import PriorityQueue
 from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 import Queue
 import atexit
@@ -36,7 +36,6 @@ Ec2Resolver = None
 RecordInvalidator = None
 TTL = None
 ZONE = None
-ec2 = None
 
 
 class Repeater(threading.Thread):
@@ -116,6 +115,23 @@ class EC2NameResolver(object):
     def __call__(self, name):
         pass
 
+
+class FakeEC2(object):
+    Reservation = namedtuple('Reservation', ('instances'))
+    Instance = namedtuple('Instance', ('id', 'tags'))
+    def __init__(self, zone):
+        self.zone = zone
+
+    def get_all_instances(self, filters=None):
+        print filters
+        return [self.Reservation(
+            [self.Instance(i, {
+                "Name": "%s.%s" % (i, self.zone.strip('.')),
+                "Address": "192.168.1.%s" % i
+            }) for i in xrange(2)]
+        )]
+
+
 class SingleLookupResolver(EC2NameResolver):
     def __call__(self, name):
         reservations = self.ec2.get_all_instances(filters={
@@ -138,7 +154,7 @@ class BatchLookupResolver(EC2NameResolver):
 
         reservations = self.ec2.get_all_instances(filters={
             "instance-state-name": "running",
-            "tag:Name": self.zone,
+            "tag:Name": "*%s" % self.zone.strip('.'),
         })
 
         self.lookup_by_name.clear()
@@ -149,7 +165,7 @@ class BatchLookupResolver(EC2NameResolver):
             self.instances_by_id = dict((i.id, i) for i in self.instances)
 
     def __call__(self, name):
-        return self.lookup_by_name[name]
+        return self.lookup_by_name[name.rstrip('.')]
 
 
 def ec2_log(msg):
@@ -165,20 +181,27 @@ def init(id_, cfg):
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
-    testing = os.environ.get('UNBOUND_DEBUG') == "true"
-    ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
-                        is_secure=not testing)
+    test_flags = os.environ.get('UNBOUND_TEST_FLAGS')
+    if test_flags is not None:
+        import json
+        test_flags = json.loads(test_flags)
+
+    if not ZONE.endswith("."):
+        ZONE += "."
+
+    if test_flags.get('mock_ec2connecion'):
+        ec2 = FakeEC2(ZONE)
+    else:
+        ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
+                            is_secure=test_flags is None)
 
     Ec2Resolver = BatchLookupResolver(ec2, ZONE)
-    if not testing:
+    #Ec2Resolver = SingleLookupResolver(ec2)
+    if test_flags.get('no_invalidate') is False:
         RecordInvalidator = BatchInvalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
             Ec2Resolver
         )
-
-
-    if not ZONE.endswith("."):
-        ZONE += "."
 
     ec2_log("connected to aws region %s" % aws_region)
     ec2_log("authoritative for zone %s" % ZONE)
