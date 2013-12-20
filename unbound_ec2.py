@@ -115,24 +115,6 @@ class BatchInvalidator(Invalidator):
                 return
 
 
-class FakeEC2(object):
-    """Mock ec2 connection.
-
-    """
-    Reservation = namedtuple('Reservation', ('instances'))
-    Instance = namedtuple('Instance', ('id', 'tags'))
-    def __init__(self, zone):
-        self.zone = zone
-
-    def get_all_instances(self, filters=None):
-        return [self.Reservation(
-            [self.Instance(i, {
-                "Name": "%s.%s" % (i, self.zone.strip('.')),
-                "Address": "192.168.1.%s" % i
-            }) for i in xrange(2)]
-        )]
-
-
 class EC2NameResolver(object):
     """Ec2 resolver interface.
 
@@ -155,6 +137,7 @@ class SingleLookupResolver(EC2NameResolver):
 
         return [instance for reservation in reservations
                      for instance in reservation.instances]
+
 
 class BatchLookupResolver(EC2NameResolver):
     """Looks up all names that look like they belong in this zone.
@@ -188,8 +171,27 @@ class BatchLookupResolver(EC2NameResolver):
         return self.lookup_by_name[name.rstrip('.')]
 
 
+class FakeEC2(object):
+    """Mock ec2 connection.
+
+    """
+    Reservation = namedtuple('Reservation', ('instances'))
+    Instance = namedtuple('Instance', ('id', 'tags'))
+    def __init__(self, zone):
+        self.zone = zone
+
+    def get_all_instances(self, filters=None):
+        return [self.Reservation(
+            [self.Instance(i, {
+                "Name": "%s.%s" % (i, self.zone.strip('.')),
+                "Address": "192.168.1.%s" % i
+            }) for i in xrange(2)]
+        )]
+
+
 def ec2_log(msg):
     log_info("unbound_ec2: %s" % msg)
+
 
 def init(id_, cfg):
     global ZONE
@@ -202,7 +204,9 @@ def init(id_, cfg):
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
     TTL = int(os.environ.get("TTL", "3600"))
     test_flags = os.environ.get('UNBOUND_TEST_FLAGS')
-    if test_flags is not None:
+    if test_flags is None:
+        test_flags = {}
+    else:
         import json
         test_flags = json.loads(test_flags)
 
