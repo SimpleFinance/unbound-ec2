@@ -161,7 +161,7 @@ class BatchLookupResolver(EC2NameResolver):
         self.instances =  [instance for reservation in reservations
                            for instance in reservation.instances]
         for i in self.instances:
-            self.lookup_by_name[i.tags['Name'].rstrip('.')].append(i)
+            self.lookup_by_name[i.tags['Name']].append(i)
             self.instances_by_id = dict((i.id, i) for i in self.instances)
 
     def __call__(self, name):
