@@ -6,7 +6,7 @@ class TestUnboundEc2(UnboundTest):
         super(TestUnboundEc2, self).setUp()
         self.unbound_stop = self._start_unbound(
             self.conf,
-            {'mock_ec2connecion': True}
+            {'mock_ec2connection': True}
         )
 
     def tearDown(self):

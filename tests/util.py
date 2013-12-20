@@ -51,7 +51,7 @@ class UnboundTest(TestCase):
         testenv = os.environ.copy()
         test_flags = {
             'no_invalidate': True,
-            'mock_ec2connecion': False
+            'mock_ec2connection': False
         }
         if unbound_flags:
             test_flags.update(unbound_flags)

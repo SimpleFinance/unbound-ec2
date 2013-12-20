@@ -212,7 +212,7 @@ def init(id_, cfg):
     if not ZONE.endswith("."):
         ZONE += "."
 
-    if test_flags.get('mock_ec2connecion'):
+    if test_flags.get('mock_ec2connection'):
         ec2 = FakeEC2(ZONE)
     else:
         ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
