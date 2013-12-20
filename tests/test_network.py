@@ -17,7 +17,7 @@ class TestBadNetwork(UnboundTest):
     def setUp(self):
 
         super(TestBadNetwork, self).setUp()
-        self._start_unbound(self.conf)
+        self.unbound_stop = self._start_unbound(self.conf)
 
     def tearDown(self):
         self.unbound_stop()
