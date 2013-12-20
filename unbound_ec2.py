@@ -39,7 +39,13 @@ ZONE = None
 
 
 class Repeater(threading.Thread):
+    """Periodically runs code in a thread.
+
+    """
     def __init__(self, delay, callme):
+        """Calls `callme`  every  `delay` seconds.
+
+        """
         threading.Thread.__init__(self)
         self.callme = callme
         self.delay = delay
@@ -99,6 +105,9 @@ class Invalidator(object):
 
 
 class BatchInvalidator(Invalidator):
+    """Exhausts invalidation queue periodically.
+
+    """
     def _worker(self):
         # update instance list.
         self.resolver.initialize()
@@ -109,21 +118,16 @@ class BatchInvalidator(Invalidator):
                 return
 
 
-class EC2NameResolver(object):
-    def __init__(self, ec2):
-        self.ec2 = ec2
-    def __call__(self, name):
-        pass
-
-
 class FakeEC2(object):
+    """Mock ec2 connection.
+
+    """
     Reservation = namedtuple('Reservation', ('instances'))
     Instance = namedtuple('Instance', ('id', 'tags'))
     def __init__(self, zone):
         self.zone = zone
 
     def get_all_instances(self, filters=None):
-        print filters
         return [self.Reservation(
             [self.Instance(i, {
                 "Name": "%s.%s" % (i, self.zone.strip('.')),
@@ -132,7 +136,20 @@ class FakeEC2(object):
         )]
 
 
+class EC2NameResolver(object):
+    """Ec2 resolver interface.
+
+    """
+    def __init__(self, ec2):
+        self.ec2 = ec2
+    def __call__(self, name):
+        pass
+
+
 class SingleLookupResolver(EC2NameResolver):
+    """Makes one API call per lookup request.
+
+    """
     def __call__(self, name):
         reservations = self.ec2.get_all_instances(filters={
             "instance-state-name": "running",
@@ -143,6 +160,12 @@ class SingleLookupResolver(EC2NameResolver):
                      for instance in reservation.instances]
 
 class BatchLookupResolver(EC2NameResolver):
+    """Looks up all names that look like they belong in this zone.
+
+    Future look up requests hit the local cache until `initialize` is called,
+    which refetches names.
+
+    """
     def __init__(self, ec2, zone):
         super(BatchLookupResolver, self).__init__(ec2)
         self.zone = zone
