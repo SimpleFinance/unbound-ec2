@@ -110,7 +110,6 @@ class Invalidator(object):
             invalidateQueryInCache(qst, qst.qinfo)
         else:
             self.queue.put((time.time(), item), False)
-        self.queue.task_done()
 
 
 class BatchInvalidator(Invalidator):
@@ -132,7 +131,6 @@ class BatchInvalidator(Invalidator):
                 invalidateQueryInCache(qst, qst.qinfo)
             else:
                 reenqueue.append((time.time(), item))
-            self.queue.task_done()
 
         # If nothing's changed, we still want to check it for invalidation,
         # but only on the next run-through
