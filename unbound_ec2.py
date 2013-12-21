@@ -221,7 +221,7 @@ def init(id_, cfg):
 
     Ec2Resolver = BatchLookupResolver(ec2, ZONE)
     #Ec2Resolver = SingleLookupResolver(ec2)
-    if test_flags.get('no_invalidate') is False:
+    if not test_flags.get('no_invalidate'):
         RecordInvalidator = BatchInvalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
             Ec2Resolver
