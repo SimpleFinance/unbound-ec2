@@ -11,6 +11,12 @@ import time
 from collections import namedtuple
 from unittest import TestCase
 
+
+if os.path.exists("/usr/sbin/unbound"):
+    UNBOUND_BINARY = "/usr/sbin/unbound" # Ubuntu
+else:
+    UNBOUND_BINARY = "/usr/local/sbin/unbound" # OS X
+
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
 def make_config(conf):
@@ -46,7 +52,7 @@ class UnboundTest(TestCase):
         nt.write(make_config(conf))
         nt.flush()
 
-        args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % nt.name)
+        args = shlex.split("%s -dv -c %s" % (UNBOUND_BINARY, nt.name))
         time.sleep(1)
         testenv = os.environ.copy()
         test_flags = {
