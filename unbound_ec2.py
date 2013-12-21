@@ -65,7 +65,6 @@ class Repeater(threading.Thread):
 
     def run(self):
         while not self.event.wait(1.0):
-            print "repeater running every %s" % self.delay
             self.callme()
             self.event.wait(self.delay)
 
@@ -93,19 +92,14 @@ class Invalidator(object):
     def stop(self):
         if self.stopping:
             return
-        print "Invalidator.stop_1"
         self.stopping = True
         self.repeater.stop()
-        print "Invalidator.stop_2"
-        print "Invalidator.stop_3"
 
     def request(self, qst, instances):
         """Record a lookup request."""
-        print "Invalidator.request"
         self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
 
     def _worker(self):
-        print "I really shouldn't be here."
         try:
             _, item = self.queue.get(False)
         except Queue.Empty:
@@ -125,39 +119,25 @@ class BatchInvalidator(Invalidator):
     """
     def _worker(self):
         # update instance list.
-        print "1"
         self.resolver.initialize()
-        print "2"
         reenqueue = []
         while not self.stopping:
-            print "3"
             try:
                 _, item = self.queue.get(False)
-                print "4"
             except Queue.Empty:
-                print "5"
                 break
-            print item
-            print "6"
             qst, old_instances = item
             instances = self.resolver(qst.qinfo.qname_str)
-            print "7"
-            print "insts: ", instances
             if set(i.id for i in instances) != old_instances:
                 invalidateQueryInCache(qst, qst.qinfo)
-                print "8"
             else:
-                print "9"
                 reenqueue.append((time.time(), item))
-            print "10"
             self.queue.task_done()
-            print "11"
 
         # If nothing's changed, we still want to check it for invalidation,
         # but only on the next run-through
         for item in reenqueue:
             self.queue.put(item, False)
-        print "12"
 
 
 class SingleLookupResolver(EC2NameResolver):
