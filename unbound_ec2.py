@@ -3,6 +3,7 @@
 
 __license__ = """
 Copyright (c) 2013 Will Maier <wcmaier@m.aier.us>
+Copyright (c) 2013 Matthew Hooker <mwhooker@gmail.com>
 
 Permission to use, copy, modify, and distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +39,16 @@ TTL = None
 ZONE = None
 
 
+class EC2NameResolver(object):
+    """Ec2 resolver interface.
+
+    """
+    def __init__(self, ec2):
+        self.ec2 = ec2
+    def __call__(self, name):
+        pass
+
+
 class Repeater(threading.Thread):
     """Periodically runs code in a thread.
 
@@ -50,6 +61,7 @@ class Repeater(threading.Thread):
         self.callme = callme
         self.delay = delay
         self.event = threading.Event()
+        self.daemon = True
 
     def run(self):
         while not self.event.wait(1.0):
@@ -65,8 +77,8 @@ class Invalidator(object):
     """Every N seconds, pop a message off the priority queue and
     check for any changes to each instance in the message.
     If there were any changes, invalidate the dns record.
-    """
 
+    """
     def __init__(self, interval, resolver):
         self.resolver = resolver
         self.interval = interval
@@ -74,11 +86,14 @@ class Invalidator(object):
         self.queue = PriorityQueue()
         self.repeater = Repeater(self.interval, self._worker)
         atexit.register(self.stop)
+        self.stopping = False
         self.repeater.start()
 
     def stop(self):
+        if self.stopping:
+            return
+        self.stopping = True
         self.repeater.stop()
-        self.queue.join()
 
     def request(self, qst, instances):
         """Record a lookup request."""
@@ -86,12 +101,9 @@ class Invalidator(object):
 
     def _worker(self):
         try:
-            self._worker_impl()
+            _, item = self.queue.get(False)
         except Queue.Empty:
-            pass
-
-    def _worker_impl(self):
-        _, item = self.queue.get(False)
+            return
         qst, old_instances = item
         instances = self.resolver(qst.qinfo.qname_str)
         if set(i.id for i in instances) != old_instances:
@@ -108,21 +120,24 @@ class BatchInvalidator(Invalidator):
     def _worker(self):
         # update instance list.
         self.resolver.initialize()
-        while True:
+        reenqueue = []
+        while not self.stopping:
             try:
-                self._worker_impl()
+                _, item = self.queue.get(False)
             except Queue.Empty:
-                return
+                break
+            qst, old_instances = item
+            instances = self.resolver(qst.qinfo.qname_str)
+            if set(i.id for i in instances) != old_instances:
+                invalidateQueryInCache(qst, qst.qinfo)
+            else:
+                reenqueue.append((time.time(), item))
+            self.queue.task_done()
 
-
-class EC2NameResolver(object):
-    """Ec2 resolver interface.
-
-    """
-    def __init__(self, ec2):
-        self.ec2 = ec2
-    def __call__(self, name):
-        pass
+        # If nothing's changed, we still want to check it for invalidation,
+        # but only on the next run-through
+        for item in reenqueue:
+            self.queue.put(item, False)
 
 
 class SingleLookupResolver(EC2NameResolver):
@@ -202,7 +217,7 @@ def init(id_, cfg):
 
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
-    TTL = int(os.environ.get("TTL", "3600"))
+    TTL = int(os.environ.get("TTL", "300"))
     test_flags = os.environ.get('UNBOUND_TEST_FLAGS')
     if test_flags is None:
         test_flags = {}
@@ -221,9 +236,9 @@ def init(id_, cfg):
 
     Ec2Resolver = BatchLookupResolver(ec2, ZONE)
     #Ec2Resolver = SingleLookupResolver(ec2)
-    if test_flags.get('no_invalidate') is False:
+    if not test_flags.get('no_invalidate'):
         RecordInvalidator = BatchInvalidator(int(
-            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
+            os.environ.get('UNBOUND_REFRESH_INTERVAL', "30")),
             Ec2Resolver
         )
 
