@@ -3,6 +3,7 @@
 
 __license__ = """
 Copyright (c) 2013 Will Maier <wcmaier@m.aier.us>
+Copyright (c) 2013 Matthew Hooker <mwhooker@gmail.com>
 
 Permission to use, copy, modify, and distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +39,16 @@ TTL = None
 ZONE = None
 
 
+class EC2NameResolver(object):
+    """Ec2 resolver interface.
+
+    """
+    def __init__(self, ec2):
+        self.ec2 = ec2
+    def __call__(self, name):
+        pass
+
+
 class Repeater(threading.Thread):
     """Periodically runs code in a thread.
 
@@ -65,8 +76,8 @@ class Invalidator(object):
     """Every N seconds, pop a message off the priority queue and
     check for any changes to each instance in the message.
     If there were any changes, invalidate the dns record.
-    """
 
+    """
     def __init__(self, interval, resolver):
         self.resolver = resolver
         self.interval = interval
@@ -86,12 +97,9 @@ class Invalidator(object):
 
     def _worker(self):
         try:
-            self._worker_impl()
+            _, item = self.queue.get(False)
         except Queue.Empty:
-            pass
-
-    def _worker_impl(self):
-        _, item = self.queue.get(False)
+            return
         qst, old_instances = item
         instances = self.resolver(qst.qinfo.qname_str)
         if set(i.id for i in instances) != old_instances:
@@ -108,21 +116,29 @@ class BatchInvalidator(Invalidator):
     def _worker(self):
         # update instance list.
         self.resolver.initialize()
-        while True:
+        print "worker"
+        reenqueue = []
+        while not self.stopping:
+            print "While true"
             try:
-                self._worker_impl()
+                _, item = self.queue.get(False)
             except Queue.Empty:
-                return
+                print "queue is empty"
+                break
+            print item
+            qst, old_instances = item
+            instances = self.resolver(qst.qinfo.qname_str)
+            print "insts: ", instances
+            if set(i.id for i in instances) != old_instances:
+                invalidateQueryInCache(qst, qst.qinfo)
+            else:
+                reenqueue.append((time.time(), item))
+            self.queue.task_done()
 
-
-class EC2NameResolver(object):
-    """Ec2 resolver interface.
-
-    """
-    def __init__(self, ec2):
-        self.ec2 = ec2
-    def __call__(self, name):
-        pass
+        # If nothing's changed, we still want to check it for invalidation,
+        # but only on the next run-through
+        for item in reenqueue:
+            self.queue.put(item, False)
 
 
 class SingleLookupResolver(EC2NameResolver):
@@ -202,7 +218,7 @@ def init(id_, cfg):
 
     aws_region = os.environ.get("AWS_REGION", "us-west-1").encode("ascii")
     ZONE = os.environ.get("ZONE", ".banksimple.com").encode("ascii")
-    TTL = int(os.environ.get("TTL", "3600"))
+    TTL = int(os.environ.get("TTL", "300"))
     test_flags = os.environ.get('UNBOUND_TEST_FLAGS')
     if test_flags is None:
         test_flags = {}
@@ -223,7 +239,7 @@ def init(id_, cfg):
     #Ec2Resolver = SingleLookupResolver(ec2)
     if not test_flags.get('no_invalidate'):
         RecordInvalidator = BatchInvalidator(int(
-            os.environ.get('UNBOUND_REFRESH_INTERVAL', "300")),
+            os.environ.get('UNBOUND_REFRESH_INTERVAL', "30")),
             Ec2Resolver
         )
 
