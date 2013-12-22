@@ -11,11 +11,7 @@ import time
 from collections import namedtuple
 from unittest import TestCase
 
-
-if os.path.exists("/usr/sbin/unbound"):
-    UNBOUND_BINARY = "/usr/sbin/unbound" # Ubuntu
-else:
-    UNBOUND_BINARY = "/usr/local/sbin/unbound" # OS X
+UNBOUND_BINARY = 'unbound'
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
