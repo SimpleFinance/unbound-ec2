@@ -3,9 +3,12 @@ from vaurien.util import start_proxy, stop_proxy
 from vaurienclient import Client as VClient
 
 import boto.ec2
+import os
+import unittest
 import vaurien.behaviors.error
 
 
+travis = os.environ.get('TRAVIS', 'false') == 'true'
 
 # boto doesn't retry 501s
 del vaurien.behaviors.error._ERRORS[501]
@@ -46,6 +49,7 @@ class TestBadNetwork(UnboundTest):
         )
         assert self.proxy_pid is not None
 
+    @unittest.skipIf(travis, "not supported in travis")
     def test_normal(self):
         # dig A @127.0.0.1 -p 5003 mwhooker.dev.banksimple.com.
         self._setup_proxy()
@@ -55,6 +59,7 @@ class TestBadNetwork(UnboundTest):
             result = self._query_ns()
             self._test_result(result)
 
+    @unittest.skipIf(travis, "not supported in travis")
     def test_under_partition(self):
         """Test that we succeed on network errors
         if we have a cached result."""
@@ -69,6 +74,7 @@ class TestBadNetwork(UnboundTest):
             result = self._query_ns()
             self._test_result(result)
 
+    @unittest.skipIf(travis, "not supported in travis")
     def test_aws_transient(self):
         """Tests that we retry requests."""
         self._setup_proxy()
@@ -78,6 +84,7 @@ class TestBadNetwork(UnboundTest):
             result = self._query_ns()
             self._test_result(result)
 
+    @unittest.skipIf(travis, "not supported in travis")
     def test_aws_5xx(self):
         """test that we succeed on 5xx errors if we have a cached
         result."""
