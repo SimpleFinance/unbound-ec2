@@ -1,5 +1,7 @@
 # unbound-ec2
 
+<img src="https://travis-ci.org/SimpleFinance/unbound-ec2.png?branch=master" />
+
 This module uses the [Unbound](http://unbound.net) DNS resolver to answer simple DNS queries using EC2 API calls. For example, the following query would match an EC2 instance with a `Name` tag of `foo.example.com`:
 
 ```

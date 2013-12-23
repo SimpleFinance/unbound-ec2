@@ -11,6 +11,8 @@ import time
 from collections import namedtuple
 from unittest import TestCase
 
+UNBOUND_BINARY = 'unbound'
+
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
 def make_config(conf):
@@ -46,7 +48,7 @@ class UnboundTest(TestCase):
         nt.write(make_config(conf))
         nt.flush()
 
-        args = shlex.split("/usr/local/sbin/unbound -dv -c %s" % nt.name)
+        args = shlex.split("%s -dv -c %s" % (UNBOUND_BINARY, nt.name))
         time.sleep(1)
         testenv = os.environ.copy()
         test_flags = {
