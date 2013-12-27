@@ -230,7 +230,7 @@ def init(id_, cfg):
         ec2 = FakeEC2(ZONE)
     else:
         ec2 = EC2Connection(region=boto.ec2.get_region(aws_region),
-                            is_secure=test_flags is None)
+                            is_secure=(not test_flags.get('testing', False)))
 
     Ec2Resolver = BatchLookupResolver(ec2, ZONE)
     #Ec2Resolver = SingleLookupResolver(ec2)
