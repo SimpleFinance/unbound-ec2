@@ -209,7 +209,6 @@ def ec2_log(msg):
 def init(id_, cfg):
     global ZONE
     global TTL
-    global ec2
     global RecordInvalidator
     global Ec2Resolver
 
@@ -284,6 +283,7 @@ def operate(id_, event, qstate, qdata):
 
 def handle_forward(id_, event, qstate, qdata):
     global TTL
+    global Ec2Resolver
 
     qname = qstate.qinfo.qname_str
     msg = DNSMessage(qname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA)
