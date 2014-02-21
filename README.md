@@ -93,12 +93,14 @@ class Unbound < Formula
 
   depends_on 'ldns'
   depends_on 'swig'
+  depends_on :python
 
   def install
     # gost requires OpenSSL >= 1.0.0, and support built into ldns
     system "./configure", "--prefix=#{prefix}",
                           "--disable-gost",
                           "--with-pythonmodule"
+
     system "make install"
   end
 end
