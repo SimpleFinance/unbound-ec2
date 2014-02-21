@@ -4,6 +4,7 @@
 __license__ = """
 Copyright (c) 2013 Will Maier <wcmaier@m.aier.us>
 Copyright (c) 2013 Matthew Hooker <mwhooker@gmail.com>
+Copyright (c) 2014 Tom Wanielista <tom@simple.com>
 
 Permission to use, copy, modify, and distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -174,8 +175,8 @@ class BatchLookupResolver(EC2NameResolver):
         })
 
         self.lookup_by_name.clear()
-        self.instances =  [instance for reservation in reservations
-                           for instance in reservation.instances]
+        self.instances = [instance for reservation in reservations
+                          for instance in reservation.instances]
         for i in self.instances:
             self.lookup_by_name[i.tags['Name']].append(i)
             self.instances_by_id = dict((i.id, i) for i in self.instances)
