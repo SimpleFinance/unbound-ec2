@@ -139,20 +139,6 @@ class BatchInvalidator(Invalidator):
             self.queue.put(item, False)
 
 
-class SingleLookupResolver(EC2NameResolver):
-    """Makes one API call per lookup request.
-
-    """
-    def __call__(self, name):
-        reservations = self.ec2.get_all_instances(filters={
-            "instance-state-name": "running",
-            "tag:Name": name.rstrip("."),
-        })
-
-        return [instance for reservation in reservations
-                     for instance in reservation.instances]
-
-
 class BatchLookupResolver(EC2NameResolver):
     """Looks up all names that look like they belong in this zone.
 
@@ -235,7 +221,6 @@ def init(id_, cfg):
                             is_secure=(not test_flags.get('testing', False)))
 
     Ec2Resolver = BatchLookupResolver(ec2, ZONE)
-    #Ec2Resolver = SingleLookupResolver(ec2)
     if not test_flags.get('no_invalidate'):
         RecordInvalidator = BatchInvalidator(int(
             os.environ.get('UNBOUND_REFRESH_INTERVAL', "30")),
