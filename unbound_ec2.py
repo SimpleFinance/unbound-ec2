@@ -46,6 +46,7 @@ class EC2NameResolver(object):
     """
     def __init__(self, ec2):
         self.ec2 = ec2
+
     def __call__(self, name):
         pass
 
@@ -182,6 +183,7 @@ class FakeEC2(object):
     """
     Reservation = namedtuple('Reservation', ('instances'))
     Instance = namedtuple('Instance', ('id', 'tags'))
+
     def __init__(self, zone):
         self.zone = zone
 
@@ -189,9 +191,8 @@ class FakeEC2(object):
         return [self.Reservation(
             [self.Instance(i, {
                 "Name": "%s.%s" % (i, self.zone.strip('.')),
-                "Address": "192.168.1.%s" % i
-            }) for i in xrange(2)]
-        )]
+                "Address": "192.168.1.%s" % i}
+            ) for i in xrange(2)])]
 
 
 def ec2_log(msg):
@@ -235,20 +236,24 @@ def init(id_, cfg):
 
     return True
 
+
 def deinit(id_):
     if RecordInvalidator:
         RecordInvalidator.stop()
     return True
 
-def inform_super(id_, qstate, superqstate, qdata): return True
+
+def inform_super(id_, qstate, superqstate, qdata):
+    return True
+
 
 def operate(id_, event, qstate, qdata):
     """
     Perform action on pending query. Accepts a new query, or work on pending
     query.
 
-    You have to set qstate.ext_state on exit. The state informs unbound about result
-    and controls the following states.
+    You have to set qstate.ext_state on exit. The state informs unbound about
+    result and controls the following states.
 
     Parameters:
         id – module identifier (integer)
@@ -258,7 +263,8 @@ def operate(id_, event, qstate, qdata):
     global ZONE
 
     if (event == MODULE_EVENT_NEW) or (event == MODULE_EVENT_PASS):
-        if (qstate.qinfo.qtype == RR_TYPE_A) or (qstate.qinfo.qtype == RR_TYPE_ANY):
+        if (qstate.qinfo.qtype == RR_TYPE_A or
+                qstate.qinfo.qtype == RR_TYPE_ANY):
             qname = qstate.qinfo.qname_str
             if qname.endswith(ZONE):
                 ec2_log("handling forward query for %s" % qname)
@@ -271,6 +277,7 @@ def operate(id_, event, qstate, qdata):
         return handle_finished(id_, event, qstate, qdata)
 
     return handle_error(id_, event, qstate, qdata)
+
 
 def handle_forward(id_, event, qstate, qdata):
     global TTL
@@ -313,18 +320,22 @@ def handle_forward(id_, event, qstate, qdata):
             log_warn("Invalidator Queue is full!")
     return True
 
+
 def handle_pass(id_, event, qstate, qdata):
     qstate.ext_state[id_] = MODULE_WAIT_MODULE
     return True
+
 
 def handle_finished(id_, event, qstate, qdata):
     qstate.ext_state[id_] = MODULE_FINISHED
     return True
 
+
 def handle_error(id_, event, qstate, qdata):
     ec2_log("bad event")
     qstate.ext_state[id_] = MODULE_ERROR
     return True
+
 
 def determine_address(instance):
     return (instance.tags.get('Address')
