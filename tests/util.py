@@ -13,6 +13,7 @@ from unittest import TestCase
 
 UNBOUND_BINARY = 'unbound'
 PROXY_PORT = 8090
+UNBOUND_PORT = 5003
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
 
@@ -90,7 +91,7 @@ class UnboundTest(TestCase):
         module = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             'unbound_ec2.py')
-        self.conf = UnboundConf(5003, module)
+        self.conf = UnboundConf(UNBOUND_PORT, module)
 
     def _query_ns(self, domain=None):
         """Query unbound for the domain.
@@ -108,7 +109,7 @@ class UnboundTest(TestCase):
         res = query.tcp(
             request, where='127.0.0.1',
             port=self.conf.port)
-        print [str(a) for a in res.answer]
+        print "query_ns: %s" % [str(a) for a in res.answer]
         return res
 
     def _test_result(self, result, domain=None):

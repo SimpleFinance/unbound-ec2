@@ -24,31 +24,20 @@ from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
 from collections import defaultdict, namedtuple
 
-import Queue
 import atexit
 import boto
 import boto.ec2
+import itertools
 import os
+import Queue
 import random
 import threading
 import time
-
 
 Ec2Resolver = None
 RecordInvalidator = None
 TTL = None
 ZONE = None
-
-
-class EC2NameResolver(object):
-    """Ec2 resolver interface.
-
-    """
-    def __init__(self, ec2):
-        self.ec2 = ec2
-
-    def __call__(self, name):
-        pass
 
 
 class Repeater(threading.Thread):
@@ -143,6 +132,35 @@ class BatchInvalidator(Invalidator):
             self.queue.put(item, False)
 
 
+class EC2NameResolver(object):
+    """Ec2 resolver interface."""
+    def __init__(self, ec2, zone):
+        self.ec2 = ec2
+        self.zone = zone
+        self.domain = zone.strip('.')
+
+    def __call__(self, name):
+        raise NotImplementedError
+
+    def initialize(self):
+        raise NotImplementedError
+
+    def _lookup(self, instance):
+        """Return a dictionary mapping CNAME to instance."""
+        lookup = defaultdict(list)
+
+        # We can support multiple names by comma-separating them.
+        names = instance.tags['Name'].split(',')
+        for name in names:
+            lookup[name].append(instance)
+
+        # We want instance-id to be a cname to the instance
+        id_name = "%s.%s" % (instance.id, self.domain)
+        lookup[id_name].append(instance)
+
+        return lookup
+
+
 class BatchLookupResolver(EC2NameResolver):
     """Looks up all names that look like they belong in this zone.
 
@@ -151,9 +169,8 @@ class BatchLookupResolver(EC2NameResolver):
 
     """
     def __init__(self, ec2, zone):
-        super(BatchLookupResolver, self).__init__(ec2)
-        self.zone = zone
-        self.lookup_by_name = defaultdict(list)
+        super(BatchLookupResolver, self).__init__(ec2, zone)
+        self.lookup_cache = {}
         self.initialize()
 
     def initialize(self):
@@ -161,20 +178,16 @@ class BatchLookupResolver(EC2NameResolver):
 
         reservations = self.ec2.get_all_reservations(filters={
             "instance-state-name": "running",
-            "tag:Name": "*%s" % self.zone.strip('.'),
+            "tag:Name": "*%s" % self.domain
         })
 
-        self.lookup_by_name.clear()
-        self.instances = [instance for reservation in reservations
-                          for instance in reservation.instances]
-        for i in self.instances:
-            names = i.tags['Name'].split(',')
-            for name in names:
-                self.lookup_by_name[name].append(i)
-                self.instances_by_id = dict((i.id, i) for i in self.instances)
+        self.lookup_cache.clear()
+
+        for instance in itertools.chain(*(i.instances for i in reservations)):
+            self.lookup_cache.update(self._lookup(instance))
 
     def __call__(self, name):
-        return self.lookup_by_name[name.rstrip('.')]
+        return self.lookup_cache[name.rstrip('.')]
 
 
 class FakeEC2(object):
@@ -189,8 +202,8 @@ class FakeEC2(object):
 
     def get_all_reservations(self, filters=None):
         return [self.Reservation(
-            [self.Instance(i, {
-                "Name": "%s.%s" % (i, self.zone.strip('.')),
+            [self.Instance("id-%s" % i, {
+                "Name": "name-%s.%s" % (i, self.zone.strip('.')),
                 "Address": "192.168.1.%s" % i}
             ) for i in xrange(2)])]
 
