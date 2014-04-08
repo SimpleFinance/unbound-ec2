@@ -1,4 +1,3 @@
-from collections import namedtuple
 from vaurien.util import start_proxy, stop_proxy
 from vaurienclient import Client as VClient
 
@@ -14,7 +13,8 @@ travis = os.environ.get('TRAVIS', 'false') == 'true'
 del vaurien.behaviors.error._ERRORS[501]
 vaurien.behaviors.error._ERROR_CODES = vaurien.behaviors.error._ERRORS.keys()
 
-from .util import UnboundTest
+from .util import UnboundTest, PROXY_PORT
+
 
 class TestBadNetwork(UnboundTest):
     def setUp(self):
@@ -39,7 +39,7 @@ class TestBadNetwork(UnboundTest):
             options = []
         self.proxy_pid = start_proxy(
             protocol=protocol,
-            proxy_port=8000,
+            proxy_port=PROXY_PORT,
             backend_host=boto.ec2.RegionData['us-west-1'],
             backend_port=80,
             options=[

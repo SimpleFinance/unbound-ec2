@@ -1,5 +1,6 @@
 from .util import UnboundTest
 
+
 class TestUnboundEc2(UnboundTest):
 
     def setUp(self):
@@ -13,5 +14,8 @@ class TestUnboundEc2(UnboundTest):
         self.unbound_stop()
 
     def test_resolve(self):
-        self.domain = '1.banksimple.com.'
+        self.domain = 'name-1.banksimple.com.'
         self._test_result(self._query_ns())
+
+        id_domain = 'id-1.banksimple.com.'
+        self._test_result(self._query_ns(id_domain), id_domain)

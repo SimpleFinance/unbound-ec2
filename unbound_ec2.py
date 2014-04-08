@@ -24,30 +24,20 @@ from boto.ec2.connection import EC2Connection
 from boto.exception import EC2ResponseError
 from collections import defaultdict, namedtuple
 
-import Queue
 import atexit
 import boto
 import boto.ec2
+import itertools
 import os
+import Queue
 import random
 import threading
 import time
-
 
 Ec2Resolver = None
 RecordInvalidator = None
 TTL = None
 ZONE = None
-
-
-class EC2NameResolver(object):
-    """Ec2 resolver interface.
-
-    """
-    def __init__(self, ec2):
-        self.ec2 = ec2
-    def __call__(self, name):
-        pass
 
 
 class Repeater(threading.Thread):
@@ -98,7 +88,10 @@ class Invalidator(object):
 
     def request(self, qst, instances):
         """Record a lookup request."""
-        self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
+        self.queue.put(
+            (time.time(), (qst, set(i.id for i in instances))),
+            False
+        )
 
     def _worker(self):
         try:
@@ -139,6 +132,35 @@ class BatchInvalidator(Invalidator):
             self.queue.put(item, False)
 
 
+class EC2NameResolver(object):
+    """Ec2 resolver interface."""
+    def __init__(self, ec2, zone):
+        self.ec2 = ec2
+        self.zone = zone
+        self.domain = zone.strip('.')
+
+    def __call__(self, name):
+        raise NotImplementedError
+
+    def initialize(self):
+        raise NotImplementedError
+
+    def _lookup(self, instance):
+        """Return a dictionary mapping CNAME to instance."""
+        lookup = defaultdict(list)
+
+        # We can support multiple names by comma-separating them.
+        names = instance.tags['Name'].split(',')
+        for name in names:
+            lookup[name].append(instance)
+
+        # We want instance-id to be a cname to the instance
+        id_name = "%s.%s" % (instance.id, self.domain)
+        lookup[id_name].append(instance)
+
+        return lookup
+
+
 class BatchLookupResolver(EC2NameResolver):
     """Looks up all names that look like they belong in this zone.
 
@@ -147,30 +169,25 @@ class BatchLookupResolver(EC2NameResolver):
 
     """
     def __init__(self, ec2, zone):
-        super(BatchLookupResolver, self).__init__(ec2)
-        self.zone = zone
-        self.lookup_by_name = defaultdict(list)
+        super(BatchLookupResolver, self).__init__(ec2, zone)
+        self.lookup_cache = {}
         self.initialize()
 
     def initialize(self):
         """Reload cache with instances."""
 
-        reservations = self.ec2.get_all_instances(filters={
+        reservations = self.ec2.get_all_reservations(filters={
             "instance-state-name": "running",
-            "tag:Name": "*%s" % self.zone.strip('.'),
+            "tag:Name": "*%s" % self.domain
         })
 
-        self.lookup_by_name.clear()
-        self.instances = [instance for reservation in reservations
-                          for instance in reservation.instances]
-        for i in self.instances:
-            names = i.tags['Name'].split(',')
-            for name in names:
-                self.lookup_by_name[name].append(i)
-                self.instances_by_id = dict((i.id, i) for i in self.instances)
+        self.lookup_cache.clear()
+
+        for instance in itertools.chain(*(i.instances for i in reservations)):
+            self.lookup_cache.update(self._lookup(instance))
 
     def __call__(self, name):
-        return self.lookup_by_name[name.rstrip('.')]
+        return self.lookup_cache[name.rstrip('.')]
 
 
 class FakeEC2(object):
@@ -179,16 +196,16 @@ class FakeEC2(object):
     """
     Reservation = namedtuple('Reservation', ('instances'))
     Instance = namedtuple('Instance', ('id', 'tags'))
+
     def __init__(self, zone):
         self.zone = zone
 
-    def get_all_instances(self, filters=None):
+    def get_all_reservations(self, filters=None):
         return [self.Reservation(
-            [self.Instance(i, {
-                "Name": "%s.%s" % (i, self.zone.strip('.')),
-                "Address": "192.168.1.%s" % i
-            }) for i in xrange(2)]
-        )]
+            [self.Instance("id-%s" % i, {
+                "Name": "name-%s.%s" % (i, self.zone.strip('.')),
+                "Address": "192.168.1.%s" % i}
+            ) for i in xrange(2)])]
 
 
 def ec2_log(msg):
@@ -232,20 +249,24 @@ def init(id_, cfg):
 
     return True
 
+
 def deinit(id_):
     if RecordInvalidator:
         RecordInvalidator.stop()
     return True
 
-def inform_super(id_, qstate, superqstate, qdata): return True
+
+def inform_super(id_, qstate, superqstate, qdata):
+    return True
+
 
 def operate(id_, event, qstate, qdata):
     """
     Perform action on pending query. Accepts a new query, or work on pending
     query.
 
-    You have to set qstate.ext_state on exit. The state informs unbound about result
-    and controls the following states.
+    You have to set qstate.ext_state on exit. The state informs unbound about
+    result and controls the following states.
 
     Parameters:
         id – module identifier (integer)
@@ -255,7 +276,8 @@ def operate(id_, event, qstate, qdata):
     global ZONE
 
     if (event == MODULE_EVENT_NEW) or (event == MODULE_EVENT_PASS):
-        if (qstate.qinfo.qtype == RR_TYPE_A) or (qstate.qinfo.qtype == RR_TYPE_ANY):
+        if (qstate.qinfo.qtype == RR_TYPE_A or
+                qstate.qinfo.qtype == RR_TYPE_ANY):
             qname = qstate.qinfo.qname_str
             if qname.endswith(ZONE):
                 ec2_log("handling forward query for %s" % qname)
@@ -268,6 +290,7 @@ def operate(id_, event, qstate, qdata):
         return handle_finished(id_, event, qstate, qdata)
 
     return handle_error(id_, event, qstate, qdata)
+
 
 def handle_forward(id_, event, qstate, qdata):
     global TTL
@@ -310,18 +333,22 @@ def handle_forward(id_, event, qstate, qdata):
             log_warn("Invalidator Queue is full!")
     return True
 
+
 def handle_pass(id_, event, qstate, qdata):
     qstate.ext_state[id_] = MODULE_WAIT_MODULE
     return True
+
 
 def handle_finished(id_, event, qstate, qdata):
     qstate.ext_state[id_] = MODULE_FINISHED
     return True
 
+
 def handle_error(id_, event, qstate, qdata):
     ec2_log("bad event")
     qstate.ext_state[id_] = MODULE_ERROR
     return True
+
 
 def determine_address(instance):
     return (instance.tags.get('Address')
