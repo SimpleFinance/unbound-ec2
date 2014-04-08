@@ -167,7 +167,7 @@ class BatchLookupResolver(EC2NameResolver):
             names = i.tags['Name'].split(',')
             for name in names:
                 self.lookup_by_name[name].append(i)
-                self.instances_by_id = dict((i.id, i) for i in self.instances)
+                self.lookup_by_name[i.id].append(i)
 
     def __call__(self, name):
         return self.lookup_by_name[name.rstrip('.')]
