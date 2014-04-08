@@ -98,7 +98,10 @@ class Invalidator(object):
 
     def request(self, qst, instances):
         """Record a lookup request."""
-        self.queue.put((time.time(), (qst, set(i.id for i in instances))), False)
+        self.queue.put(
+            (time.time(), (qst, set(i.id for i in instances))),
+            False
+        )
 
     def _worker(self):
         try:

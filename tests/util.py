@@ -1,4 +1,4 @@
-from dns import resolver, query
+from dns import query
 import json
 import dns.message
 import dns.name
@@ -12,8 +12,10 @@ from collections import namedtuple
 from unittest import TestCase
 
 UNBOUND_BINARY = 'unbound'
+PROXY_PORT = 8090
 
 UnboundConf = namedtuple('UnboundConf', ('port', 'module'))
+
 
 def make_config(conf):
     tpl = """
@@ -37,6 +39,8 @@ python:
         python-script: "{conf.module}"
 """
     return tpl.format(conf=conf)
+
+
 class UnboundTest(TestCase):
 
     @staticmethod
@@ -60,7 +64,7 @@ class UnboundTest(TestCase):
             test_flags.update(unbound_flags)
         testenv.update({
             'AWS_REGION': 'proxy',
-            'http_proxy': 'localhost:8000',
+            'http_proxy': 'localhost:%s' % PROXY_PORT,
             'UNBOUND_TEST_FLAGS': json.dumps(test_flags)
         })
         proc = subprocess.Popen(args, env=testenv)
@@ -89,6 +93,11 @@ class UnboundTest(TestCase):
         self.conf = UnboundConf(5003, module)
 
     def _query_ns(self, domain=None):
+        """Query unbound for the domain.
+
+        domain defaults to self.domain if None.
+
+        """
         if not domain:
             domain = self.domain
         domain = dns.name.from_text(domain)
@@ -103,11 +112,15 @@ class UnboundTest(TestCase):
         return res
 
     def _test_result(self, result, domain=None):
+        """Test that domain is in the result record.
+
+        domain defaults to self.domain if None.
+
+        """
         if not domain:
             domain = self.domain
         self.assertTrue(len(result.answer) == 1)
         self.assertRegexpMatches(
-            result.answer[0].to_text(), 
-            "%s \d+ IN A \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}" % domain
+            result.answer[0].to_text(),
+            r"%s \d+ IN A \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}" % domain
         )
-

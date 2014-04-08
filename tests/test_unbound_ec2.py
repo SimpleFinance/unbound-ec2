@@ -1,5 +1,6 @@
 from .util import UnboundTest
 
+
 class TestUnboundEc2(UnboundTest):
 
     def setUp(self):
