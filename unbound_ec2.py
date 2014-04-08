@@ -155,7 +155,7 @@ class BatchLookupResolver(EC2NameResolver):
     def initialize(self):
         """Reload cache with instances."""
 
-        reservations = self.ec2.get_all_instances(filters={
+        reservations = self.ec2.get_all_reservations(filters={
             "instance-state-name": "running",
             "tag:Name": "*%s" % self.zone.strip('.'),
         })
@@ -182,7 +182,7 @@ class FakeEC2(object):
     def __init__(self, zone):
         self.zone = zone
 
-    def get_all_instances(self, filters=None):
+    def get_all_reservations(self, filters=None):
         return [self.Reservation(
             [self.Instance(i, {
                 "Name": "%s.%s" % (i, self.zone.strip('.')),
