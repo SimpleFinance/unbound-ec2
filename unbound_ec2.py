@@ -170,7 +170,7 @@ class BatchLookupResolver(EC2NameResolver):
     """
     def __init__(self, ec2, zone):
         super(BatchLookupResolver, self).__init__(ec2, zone)
-        self.lookup_cache = {}
+        self.lookup_cache = defaultdict(list)
         self.initialize()
 
     def initialize(self):
@@ -184,7 +184,8 @@ class BatchLookupResolver(EC2NameResolver):
         self.lookup_cache.clear()
 
         for instance in itertools.chain(*(i.instances for i in reservations)):
-            self.lookup_cache.update(self._lookup(instance))
+            for name, addresses in self._lookup(instance).items():
+                self.lookup_cache[name].extend(addresses)
 
     def __call__(self, name):
         return self.lookup_cache[name.rstrip('.')]
