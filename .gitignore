@@ -1,0 +1,13 @@
+*.pyc
+.idea
+*.swp
+*.egg
+*.egg-info
+dist/
+build/
+coverage.xml
+report.xml
+.coverage
+.eggs
+version.py
+*.iml

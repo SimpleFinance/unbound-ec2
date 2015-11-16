@@ -1,0 +1,20 @@
+[ec2]
+aws_region = us-west-1
+
+[lookup]
+type = cache # cache, direct
+tag_name_include_domain = true
+
+[lookup_filters]
+instance-state-name = running
+
+[main]
+zone = example.com
+ttl = 300
+cache_ttl = 30
+# private, public
+ip_order = private
+
+[server]
+# authoritative, caching
+type = caching

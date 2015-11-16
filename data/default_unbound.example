@@ -1,0 +1,8 @@
+export AWS_DEFAULT_REGION=us-west-1
+export UNBOUND_ZONE=example.com
+export UNBOUND_TTL=300
+export UNBOUND_CACHE_TTL=30
+export UNBOUND_SERVER_TYPE=caching
+export UNBOUND_LOOKUP_TYPE=cache
+export UNBOUND_LOOKUP_TAG_NAME_INCLUDE_DOMAIN=true
+export UNBOUND_IP_ORDER=private
