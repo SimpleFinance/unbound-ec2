@@ -1,6 +1,6 @@
 # unbound-ec2
 
-[![Build Status](https://api.travis-ci.org/SimpleFinance/unbound-ec2.svg)](https://travis-ci.org/SimpleFinance/unbound-ec2)
+[![Build Status](https://api.travis-ci.org/unibet/unbound-ec2.svg)](https://travis-ci.org/unibet/unbound-ec2)
 [![Version](http://img.shields.io/pypi/v/unbound-ec2.svg?style=flat)](https://pypi.python.org/pypi/unbound-ec2/)
 
 This module uses the [Unbound](http://unbound.net) DNS resolver to answer simple DNS queries using EC2 API calls.
