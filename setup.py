@@ -58,6 +58,7 @@ setup(name='unbound-ec2',
       ])],
       scripts=['bin/unbound_ec2'],
       license="Apache License 2.0",
+      platforms = "Posix; MacOS X",
       classifiers=[
          'Development Status :: 5 - Production/Stable',
          'Intended Audience :: Developers',
