@@ -16,7 +16,7 @@ except ImportError:
 version_py = os.path.join(os.path.dirname(__file__), 'version.py')
 
 try:
-    p = subprocess.Popen(['git', 'describe'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(['git', 'describe', '--tags'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     o = p.communicate()
     if p.returncode != 0:
         raise Exception('git describe failed to execute reason: %s' % o[1])
@@ -33,6 +33,7 @@ version = "{ver}".format(ver=version_git)
 setup(name='unbound-ec2',
       version=version,
       description='Unbound DNS resolver to answer simple DNS queries using EC2 API calls',
+      long_description=open('README.md').read(),
       author=__author__,
       author_email=__author_email__,
       url='https://github.com/SimpleFinance/unbound-ec2',
@@ -55,5 +56,15 @@ setup(name='unbound-ec2',
           'data/unbound_ec2.conf.example',
           'data/default_unbound.example'
       ])],
-      scripts=['bin/unbound_ec2']
-      )
+      scripts=['bin/unbound_ec2'],
+      license="Apache License 2.0",
+      classifiers=[
+         'Development Status :: 5 - Production/Stable',
+         'Intended Audience :: Developers',
+         'Natural Language :: English',
+         'License :: OSI Approved :: Apache Software License',
+         'Programming Language :: Python',
+         'Programming Language :: Python :: 2.6',
+         'Programming Language :: Python :: 2.7'
+      ]
+)
