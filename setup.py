@@ -33,7 +33,7 @@ version = "{ver}".format(ver=version_git)
 setup(name='unbound-ec2',
       version=version,
       description='Unbound DNS resolver to answer simple DNS queries using EC2 API calls',
-      long_description=open('README.md').read(),
+      long_description=open('README.rst').read(),
       author=__author__,
       author_email=__author_email__,
       url='https://github.com/unibet/unbound-ec2',
