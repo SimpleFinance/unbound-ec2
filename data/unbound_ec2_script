@@ -5,14 +5,8 @@ import sys
 if sys.version_info[:2] == (2, 6):
    from distutils import sysconfig
    sys.path.append(sysconfig.get_python_lib())
-
-   from unbound_ec2.script import *
 else:
    import sysconfig
    sys.path.append(sysconfig.get_path('purelib'))
 
-   import pkg_resources
-
-   __requires__ = 'unbound-ec2'
-
-   pkg_resources.run_script('unbound-ec2', 'unbound_ec2')
+from unbound_ec2.script import *
