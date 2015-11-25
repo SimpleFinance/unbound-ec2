@@ -32,7 +32,7 @@ class TestDirectLookup(unittest.TestCase):
 
     def test_resolve(self):
         resolve = self.directlookup.resolve()
-        self.assertEqual(len(resolve), RESERVATION_COUNT * 2)
+        self.assertEqual(len(resolve), RESERVATION_COUNT * 3)
         for i in xrange(RESERVATION_COUNT):
             self.assertIn('id-%d.%s' % (i, self.domain), resolve)
             self.assertIn('name-%d.%s' % (i, self.domain), resolve)
@@ -57,10 +57,10 @@ class TestCacheLookup(unittest.TestCase):
     def test_invalidate(self):
         self.assertEqual(0, len(self.cachelookup.cache))
         self.cachelookup.resolve()
-        self.assertEqual(len(self.cachelookup.cache), RESERVATION_COUNT * 2)
+        self.assertEqual(len(self.cachelookup.cache), RESERVATION_COUNT * 3)
         self.assertIn('id-0.%s' % self.domain, self.cachelookup.cache)
         self.cachelookup.invalidate('id-0.%s' % self.domain)
-        self.assertEqual(len(self.cachelookup.cache), (RESERVATION_COUNT * 2) - 1)
+        self.assertEqual(len(self.cachelookup.cache), (RESERVATION_COUNT * 3) - 1)
         self.assertNotIn('id-0.%s' % self.domain, self.cachelookup.cache)
         self.cachelookup.invalidate()
         self.assertEqual(0, len(self.cachelookup.cache))

@@ -11,6 +11,7 @@ class TestConfig(unittest.TestCase):
 
     def tearDown(self):
         os.environ['UNBOUND_ZONE'] = config.DEFAULT_ZONE
+        os.environ['UNBOUND_REVERSE_ZONE'] = config.DEFAULT_REVERSE_ZONE
         os.environ['UNBOUND_TTL'] = config.DEFAULT_TTL
         os.environ['UNBOUND_CACHE_TTL'] = config.DEFAULT_CACHE_TTL
         os.environ['UNBOUND_SERVER_TYPE'] = config.DEFAULT_SERVER_TYPE
@@ -43,6 +44,7 @@ class TestConfig(unittest.TestCase):
         self.config.set_defaults()
         self.assertIn('aws_region', self.config.ec2)
         self.assertIn('zone', self.config.main)
+        self.assertIn('reverse_zone', self.config.main)
         self.assertIn('ttl', self.config.main)
         self.assertIn('cache_ttl', self.config.main)
         self.assertIn('type', self.config.server)
@@ -50,6 +52,7 @@ class TestConfig(unittest.TestCase):
         self.assertIn('tag_name_include_domain', self.config.lookup)
         self.assertEqual(self.config.ec2['aws_region'], config.DEFAULT_AWS_REGION)
         self.assertEqual(self.config.main['zone'], config.DEFAULT_ZONE)
+        self.assertEqual(self.config.main['reverse_zone'], config.DEFAULT_REVERSE_ZONE)
         self.assertEqual(self.config.main['ttl'], int(config.DEFAULT_TTL))
         self.assertEqual(self.config.main['ip_order'], config.DEFAULT_IP_ORDER)
         self.assertEqual(self.config.server['type'], config.DEFAULT_SERVER_TYPE)
@@ -60,6 +63,7 @@ class TestConfig(unittest.TestCase):
 
     def test_set_defaults_env_overwrite(self):
         os.environ['UNBOUND_ZONE'] = 'BOGUS_TLD'
+        os.environ['UNBOUND_REVERSE_ZONE'] = 'BOGUS_REVERSE_ZONE'
         os.environ['UNBOUND_TTL'] = 'BOGUS_TTL'
         os.environ['UNBOUND_CACHE_TTL'] = 'BOGUS_CACHE_TTL'
         os.environ['AWS_DEFAULT_REGION'] = 'BOGUS_AWS_REGION'
@@ -70,6 +74,7 @@ class TestConfig(unittest.TestCase):
         self.config.set_defaults()
         self.assertEqual(self.config.ec2['aws_region'], 'BOGUS_AWS_REGION')
         self.assertEqual(self.config.main['zone'], 'BOGUS_TLD')
+        self.assertEqual(self.config.main['reverse_zone'], 'BOGUS_REVERSE_ZONE')
         self.assertEqual(self.config.main['ttl'], 'BOGUS_TTL')
         self.assertEqual(self.config.main['cache_ttl'], 'BOGUS_CACHE_TTL')
         self.assertEqual(self.config.main['ip_order'], 'BOGUS_IP_ORDER')
@@ -88,6 +93,7 @@ class TestConfig(unittest.TestCase):
         self.assertIn('cache_ttl', self.config.main)
         self.assertEqual(self.config.ec2['aws_region'], 'BOGUS_AWS_REGION_FROM_CONF_FILE')
         self.assertEqual(self.config.main['zone'], 'BOGUS_ZONE_FROM_CONF_FILE')
+        self.assertEqual(self.config.main['reverse_zone'], 'BOGUS_REVERSE_ZONE_FROM_CONF_FILE')
         self.assertEqual(self.config.main['ttl'], 'BOGUS_TTL_FROM_CONF_FILE')
         self.assertEqual(self.config.main['cache_ttl'], 'BOGUS_CACHE_TTL_FROM_CONF_FILE')
         self.assertEqual(self.config.main['ip_order'], 'BOGUS_IP_ORDER_FROM_CONF_FILE')
@@ -102,6 +108,7 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(self.config.parse())
         self.assertIn('aws_region', self.config.ec2)
         self.assertIn('zone', self.config.main)
+        self.assertNotIn('reverse_zone', self.config.main)
         self.assertNotIn('ttl', self.config.main)
         self.assertNotIn('cache_ttl', self.config.main)
         self.assertNotIn('tag_name_include_domain', self.config.lookup)
@@ -118,6 +125,7 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(self.config.parse())
         self.assertEqual(self.config.ec2['aws_region'], 'BOGUS_AWS_REGION_FROM_CONF_FILE')
         self.assertEqual(self.config.main['zone'], 'BOGUS_ZONE_FROM_CONF_FILE')
+        self.assertEqual(self.config.main['reverse_zone'], config.DEFAULT_REVERSE_ZONE)
         self.assertEqual(self.config.main['ttl'], int(config.DEFAULT_TTL))
         self.assertEqual(self.config.main['cache_ttl'], int(config.DEFAULT_CACHE_TTL))
         self.assertEqual(self.config.server['type'], 'BOGUS_SERVER_TYPE_FROM_FILE')

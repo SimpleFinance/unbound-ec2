@@ -10,6 +10,7 @@ instance-state-name = running
 
 [main]
 zone = example.com
+reverse_zone = 76.10.in-addr.arpa
 ttl = 300
 cache_ttl = 30
 # private, public

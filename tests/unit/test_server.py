@@ -8,7 +8,7 @@ class TestServer(server.Server):
     HANDLE_FORWARD_RESULT = 'dummy_handle_forward'
     DNSMSG = mock.MagicMock()
 
-    def handle_forward(self, _id, event, qstate, qdata):
+    def handle_request(self, _id, event, qstate, qdata, request_type):
         return self.HANDLE_FORWARD_RESULT
 
     def new_dns_msg(self, qname):
@@ -18,11 +18,12 @@ class TestServer(server.Server):
 class TestAbstractServer(unittest.TestCase):
     def setUp(self):
         server.log_info = mock.Mock()
-        lookup_mock = mock.Mock()
+        lookup_mock = mock.MagicMock()
         self.zone = '.bogus.tld'
+        self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 'bogus_ttl'
         self.ip_order = 'bogus_ip_order'
-        self.srv = TestServer(self.zone, self.ttl, lookup_mock, self.ip_order)
+        self.srv = TestServer(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order)
 
     def tearDown(self):
         self.srv = None
@@ -68,9 +69,10 @@ class TestAuthoritativeServer(unittest.TestCase):
         server.log_info = mock.Mock()
         lookup_mock = mock.MagicMock()
         self.zone = '.bogus.tld'
+        self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 'bogus_ttl'
         self.ip_order = 'bogus_ip_order'
-        self.srv = server.Authoritative(self.zone, self.ttl, lookup_mock, self.ip_order)
+        self.srv = server.Authoritative(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order)
 
     def tearDown(self):
         self.srv = None
@@ -91,9 +93,10 @@ class TestCachingServer(unittest.TestCase):
         server.log_info = mock.Mock()
         self.lookup_mock = mock.MagicMock()
         self.zone = '.bogus.tld'
+        self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 88888881
         self.ip_order = 'bogus_ip_order'
-        self.srv = server.Caching(self.zone, self.ttl, self.lookup_mock, self.ip_order)
+        self.srv = server.Caching(self.zone, self.reverse_zone, self.ttl, self.lookup_mock, self.ip_order)
 
     def tearDown(self):
         self.srv = None

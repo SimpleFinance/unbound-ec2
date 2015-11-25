@@ -10,8 +10,9 @@ class Server:
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, zone, ttl, lookup, ip_order):
-        self.zone = '%s.' % zone.rstrip('.')
+    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order):
+        self.zone = '%s.' % zone.strip('.')
+        self.reverse_zone = '%s.' % reverse_zone.strip('.')
         self.lookup = lookup
         self.ttl = ttl
         self.ip_order = ip_order
@@ -30,7 +31,10 @@ class Server:
             if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY]:
                 qname = qstate.qinfo.qname_str
                 if qname.endswith(self.zone):
-                    return self.handle_forward(_id, event, qstate, qdata)
+                    return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
+            if qstate.qinfo.qtype in [RR_TYPE_PTR]:
+                if qname.endswith(self.reverse_zone):
+                    return self.handle_request(_id, event, qstate, qdata, getattr(self, 'reverse_record'))
 
             return self.handle_pass(_id, event, qstate, qdata)
 
@@ -39,7 +43,7 @@ class Server:
 
         return self.handle_error(_id, event, qstate, qdata)
 
-    def handle_forward(self, _id, event, qstate, qdata):
+    def handle_request(self, _id, event, qstate, qdata, record_function):
         """
         Handle requests that match the serving criteria
 
@@ -58,7 +62,7 @@ class Server:
         else:
             qstate.return_rcode = RCODE_NOERROR
             for instance in instances:
-                record = "%s %d IN A %s" % (qname, self.ttl, self.__determine_address(instance))
+                record = record_function(qname, instance).encode("ascii")
                 msg.answer.append(record)
 
         if not msg.set_return_msg(qstate):
@@ -127,6 +131,15 @@ class Server:
         return (instance.tags.get('Address')
                 or ordered_address).encode("ascii")
 
+    def __determine_name(self, instance):
+        return '%s.%s.' % (instance.id, self.zone.strip('.'))
+
+    def forward_record(self, qname, instance):
+        return "%s %d IN A %s" % (qname, self.ttl, self.__determine_address(instance))
+
+    def reverse_record(self, qname, instance):
+        return "%s %d IN PTR %s" % (qname, self.ttl, self.__determine_name(instance))
+
 
 class Authoritative(Server):
     """This server will return non-cached authoritative answers.
@@ -146,8 +159,8 @@ class Caching(Server):
     """This server will serve cached answers.
     """
 
-    def __init__(self, zone, ttl, lookup, ip_order):
-        Server.__init__(self, zone, ttl, lookup, ip_order)
+    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order):
+        Server.__init__(self, zone, reverse_zone, ttl, lookup, ip_order)
         self.cached_requests = {}
 
     def new_dns_msg(self, qname):

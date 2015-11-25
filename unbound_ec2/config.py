@@ -5,6 +5,7 @@ import ast
 DEFAULT_CONF_FILE = '/etc/unbound/unbound_ec2.conf'
 DEFAULT_AWS_REGION = 'us-west-1'
 DEFAULT_ZONE = 'zone.tld'
+DEFAULT_REVERSE_ZONE = '127.in-addr.arpa'
 DEFAULT_TTL = '300'
 DEFAULT_CACHE_TTL = '30'
 DEFAULT_SERVER_TYPE = 'caching'
@@ -35,6 +36,7 @@ class UnboundEc2Conf(object):
         """
         self.ec2['aws_region'] = os.environ.get('AWS_DEFAULT_REGION', DEFAULT_AWS_REGION).encode('ascii')
         self.main['zone'] = os.environ.get('UNBOUND_ZONE', DEFAULT_ZONE).encode('ascii')
+        self.main['reverse_zone'] = os.environ.get('UNBOUND_REVERSE_ZONE', DEFAULT_REVERSE_ZONE).encode('ascii')
         self.main['ttl'] = self.__try_type(os.environ.get('UNBOUND_TTL', DEFAULT_TTL).encode('ascii'))
         self.main['cache_ttl'] = self.__try_type(
             os.environ.get('UNBOUND_CACHE_TTL', DEFAULT_CACHE_TTL).encode('ascii'))

@@ -36,7 +36,23 @@ class DirectLookup:
                 lookup_name = name if self.domain in name else '%s.%s' % (name, self.domain)
                 result[lookup_name].append(instance)
 
-        # We want instance-id to be a cname to the instance
+        if 'Address' in instance.tags:
+            addresses = instance.tags['Address'].split(',')
+            for address in addresses:
+                reversed_address = '.'.join(reversed(address.encode("ascii").split('.'))) + '.in-addr.arpa'
+                result[reversed_address].append(instance)
+
+        # Reverse resolve private address
+        if hasattr(instance, 'private_ip_address') and instance.private_ip_address:
+            result['.'.join(reversed(instance.private_ip_address.encode("ascii").split('.'))) +
+                   '.in-addr.arpa'].append(instance)
+
+        # Reverse resolve default address
+        if hasattr(instance, 'instance') and instance.ip_address:
+            result['.'.join(reversed(instance.ip_address.encode("ascii").split('.'))) +
+                   '.in-addr.arpa'].append(instance)
+
+        # Also resolve concatenation of instance id and domain
         id_lookup_name = "%s.%s" % (instance.id, self.domain)
         result[id_lookup_name].append(instance)
 
