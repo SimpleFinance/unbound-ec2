@@ -88,7 +88,7 @@ When more than one instance matches the ``DescribeInstances`` query, ``unbound-e
 In case of caching type server, query results will be cached by Unbound, and a TTL (default: 300 seconds) is defined
 to encourage well-behaved clients to cache the information themselves.
 
-Public addresses, IPv6, and reverse DNS lookups (PTR) are not yet supported.
+IPv6 are not yet supported.
 
 Unit tests
 ----------
