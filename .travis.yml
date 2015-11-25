@@ -1,19 +1,18 @@
 language: python
 python:
-  - "2.6"
-  - "2.7"
+  - '2.6'
+  - '2.7'
 install:
   - sudo mkdir /etc/unbound
   - sudo -E chown $USER /etc/unbound
   - python setup.py install
 script: python setup.py test
-
 deploy:
   provider: pypi
-  user:
-    secure: "Razb81C1ibl/1obVUF4JNpchv/xodGKMxgEJMV5c2mePEAZ8bvK4UbN+IBgh6n1XSFuSOmVkS6lHX1qYW+o7kgjYmKbzvNe8HD2Cwl7ytZ6ju5+eYu1Crq3QNFqg3I/wvJNMellcfOhXl2kWxNkmL9WWXtSaCgG6x3gd6H6TxKXaHCdV5mSoEufMsMyYKYF7AKGrqk2wrG118yEXBg03FMDnE2NK/isJzFv+1ryhF4ZBvXuMyM5r5VgnvY9Rm+HKYhCsc+iM+6PGrcT/sioynESpQsjsYt0WqwnQlIYuGBkFLmaumXNpzEq/Q74kscFnSCHBiGsyTDrTjJW/V7Fz1nw2tpkLQkvagSlb86p9eqdd0QFFspx4fPHOu5sNZGsvigHI7sXt4YzOMQrtTrQYfJ5SddBLkMpMaCGAongSPwROD+KpTmZzEq/ayS3rpWUbf993DcUN7mHImMeRnctbZKe0jPvmwLqP3LE/IzAKASQRep+OfWby+CeiycNwH5cDSPTSsvXcXeFPR4DqqVwsHmaM2sCgnBOsJ+gxan5iZpj36ZY0Gz1cYQ7H8pr14U7JgzFhmCjao8lKMZRmYy+pXp8MwBTqCU6Cf1QtynzObSNuKZGrj+KDb2nDBfi1lKkD+wIHCFrEsaDpFVL/dWcyW8aoT9Urlad0Tojhwr22ljs="
-  password:
-    secure: "pefVZ1mfzPuFC26Jx1aHYrSDtclxi9xXLYfpQV/kKvCkeokI6CY9MXwiHrmYotMvdkcfkKmmQ15/BeWYqz/XFCMXn11isQhCr7GFaaIeQB97ejqn6JsLeVVu+jyOh6zCsFUrBTgftDd+7cAzWI2r8Rsmi1oxxGEfYJq6FhpCSDnma0xycQhkAkD25lcOl2ePb3Q/vviN20ZmZThhJ8isRvRCX92hM4VYiat/XVV4DrkLp+JtB8zFtl1iKt6MzyydC2B//UJvCFfgkOddi3jlXPsXZVqkdXQM7udZwCW8/NPzJu1K084ErC/BTj8dH3wVWqob0D4M8lexOUGrqptpl6RfOwk8u+vfRkw25X+/SZbesTAb9GcXH6pGbcknrxjJd8yxot7DUpQufiZBxuJABdDgXMMcmJaUD9C0XMUoRSHw3Al8OysKuBDEhp1kt9Q42xrZCUkZEBUzb93OIHPZObrBMhoeyRQyzz4KzkLz7PT3QSdFGPCuvLA+aJpj6ijwAx0vEgJAyOZRMlQALuRB7l6QwFm80Bi8mtb9MgOZBPTnPFUAAQ1neAP0AWkOktnwEgOZYpqVslOw+NzHKozzCTmLQFUXnFv88WU7N09ZoQowhfpIVmaAtlcJ0r5YK5y1f9rroNkZPmNoKZnwbrQdPBlxI4Y7k1zTzKlXXlJPWo0="
   on:
     tags: true
     branch: master
+  user:
+    secure: Vtvi3FeyeeaXnhXsGbOSBPcINyLt4sXKwzvGv81OSxF8jNGCv3Z6lB9XAWde3/x/KxBihnub8ylxQky6WT46tmDI7vPokDa3XuPRvwZNucMArzl+P3f2h0IDIo4ixN32xC2Jf3+i4Dwzb52iWiTX3Q434hod7x8pfLbs4sw1vl4=
+  password:
+    secure: tMhFS3hoZlUwqCv2BOHrj1MIUY7DjAsJ4V8y6aYXwQ89+UuGityvE1MkTAOUEuVCeKlrmztV1rBtRjrHXJYLo8dnlasOUZL6D7cKhCQZS7LqDTSsYNfl04hdCTPJfnPZWtd3sRiEaw3thvIl0h2pbNC+Dg38lsc2bLXEfzfnTMs=
