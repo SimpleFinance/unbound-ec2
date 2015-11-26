@@ -26,13 +26,27 @@ def init(id, cfg):
 
     ec2 = EC2Connection(region=boto.ec2.get_region(conf.ec2['aws_region']))
 
-    _lookup = lookup.DirectLookup(ec2, conf.main['zone'], conf.lookup_filters, conf.lookup['tag_name_include_domain']) \
-        if conf.lookup['type'] == 'direct' else \
-        lookup.CacheLookup(ec2, conf.main['zone'], conf.lookup_filters, conf.lookup['tag_name_include_domain'])
+    _lookup = lookup.DirectLookup(ec2,
+                                  conf.main['zone'],
+                                  conf.lookup_filters,
+                                  conf.lookup['tag_name_include_domain']) \
+        if conf.lookup['type'] == 'direct' \
+        else lookup.CacheLookup(ec2,
+                                conf.main['zone'],
+                                conf.lookup_filters,
+                                conf.lookup['tag_name_include_domain'])
 
-    _server = server.Authoritative(conf.main['zone'], conf.main['ttl'], _lookup, conf.main['ip_order']) \
-        if conf.server['type'] == 'authoritative' else \
-        server.Caching(conf.main['zone'], conf.main['ttl'], _lookup, conf.main['ip_order'])
+    _server = server.Authoritative(conf.main['zone'],
+                                   conf.main['reverse_zone'],
+                                   conf.main['ttl'],
+                                   _lookup,
+                                   conf.main['ip_order']) \
+        if conf.server['type'] == 'authoritative' \
+        else server.Caching(conf.main['zone'],
+                            conf.main['reverse_zone'],
+                            conf.main['ttl'],
+                            _lookup,
+                            conf.main['ip_order'])
 
     if conf.lookup['type'] != 'direct':
         _rr = repeater.RecursiveRepeater(conf.main['cache_ttl'], invalidator.CacheInvalidator(_server).invalidate)
