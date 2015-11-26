@@ -28,8 +28,8 @@ class Server:
         :return:
         """
         if event in [MODULE_EVENT_NEW, MODULE_EVENT_PASS]:
+            qname = qstate.qinfo.qname_str
             if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY]:
-                qname = qstate.qinfo.qname_str
                 if qname.endswith(self.zone):
                     return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
             if qstate.qinfo.qtype in [RR_TYPE_PTR]:
