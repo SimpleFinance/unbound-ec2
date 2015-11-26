@@ -132,7 +132,9 @@ class Server:
                 or ordered_address).encode("ascii")
 
     def __determine_name(self, instance):
-        return '%s.%s.' % (instance.id, self.zone.strip('.'))
+        domain = self.zone.rstrip('.')
+        name = instance.tags['Name'].split(',')[0].rstrip('.') if 'Name' in instance.tags else instance.id
+        return '%s.' % (name if domain in name else '%s.%s' % (name, domain)).encode("ascii")
 
     def forward_record(self, qname, instance):
         return "%s %d IN A %s" % (qname, self.ttl, self.__determine_address(instance))
