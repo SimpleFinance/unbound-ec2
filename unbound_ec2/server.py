@@ -29,12 +29,12 @@ class Server:
         """
         if event in [MODULE_EVENT_NEW, MODULE_EVENT_PASS]:
             qname = qstate.qinfo.qname_str
-            if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY]:
-                if qname.endswith(self.zone):
-                    return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
-            if qstate.qinfo.qtype in [RR_TYPE_PTR]:
-                if qname.endswith(self.reverse_zone):
-                    return self.handle_request(_id, event, qstate, qdata, getattr(self, 'reverse_record'))
+            if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY] and qname.endswith(self.zone):
+                return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
+            elif qstate.qinfo.qtype in [RR_TYPE_PTR] and qname.endswith(self.reverse_zone):
+                return self.handle_request(_id, event, qstate, qdata, getattr(self, 'reverse_record'))
+            elif qname.endswith(self.zone) or qname.endswith(self.reverse_zone):
+                return self.handle_request_empty(_id, event, qstate, qdata)
 
             return self.handle_pass(_id, event, qstate, qdata)
 
@@ -42,6 +42,24 @@ class Server:
             return self.handle_finished(_id, event, qstate, qdata)
 
         return self.handle_error(_id, event, qstate, qdata)
+
+    def handle_request_empty(self, _id, event, qstate, qdata):
+        """
+        Handle requests within the managed domains but RR types that we ignore
+
+        :param _id:
+        :param event:
+        :param qstate:
+        :param qdata:
+        :return:
+        """
+        qname = qstate.qinfo.qname_str
+        msg = self.new_dns_msg(qname)
+        qstate.return_rcode = RCODE_NOERROR
+        msg.set_return_msg(qstate)
+        qstate.return_msg.rep.security = 2
+        qstate.ext_state[_id] = MODULE_FINISHED
+        return True
 
     def handle_request(self, _id, event, qstate, qdata, record_function):
         """

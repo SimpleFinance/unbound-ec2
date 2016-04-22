@@ -33,6 +33,7 @@ class TestAbstractServer(unittest.TestCase):
         event = attrs['MODULE_EVENT_NEW']
         qstate = mock.MagicMock()
         qdata = mock.MagicMock()
+        qstate.qinfo.qname_str = "fqdn.not-bogus.tld"
         self.assertTrue(self.srv.operate(id, event, qstate, qdata))
         qstate.ext_state.__setitem__.assert_called_with(id, attrs['MODULE_WAIT_MODULE'])
 
@@ -41,6 +42,7 @@ class TestAbstractServer(unittest.TestCase):
         event = attrs['MODULE_EVENT_PASS']
         qstate = mock.MagicMock()
         qdata = mock.MagicMock()
+        qstate.qinfo.qname_str = "fqdn.not-bogus.tld"
         self.assertTrue(self.srv.operate(id, event, qstate, qdata))
         qstate.ext_state.__setitem__.assert_called_with(id, attrs['MODULE_WAIT_MODULE'])
 
@@ -82,6 +84,16 @@ class TestAuthoritativeServer(unittest.TestCase):
         event = attrs['MODULE_EVENT_NEW']
         qstate = mock.MagicMock()
         qstate.qinfo.qtype = attrs['RR_TYPE_A']
+        qstate.qinfo.qname_str = 'bogus-name%s.' % self.zone
+        qdata = mock.MagicMock()
+        server.DNSMessage = mock.MagicMock()
+        self.assertTrue(self.srv.operate(id, event, qstate, qdata))
+
+    def test_handle_empty(self):
+        id = 'bogus_id'
+        event = attrs['MODULE_EVENT_NEW']
+        qstate = mock.MagicMock()
+        qstate.qinfo.qtype = attrs['RR_TYPE_TXT']
         qstate.qinfo.qname_str = 'bogus-name%s.' % self.zone
         qdata = mock.MagicMock()
         server.DNSMessage = mock.MagicMock()
