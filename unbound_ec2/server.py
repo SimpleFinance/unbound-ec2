@@ -10,12 +10,16 @@ class Server:
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order):
+    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order, forwarded_zones):
         self.zone = '%s.' % zone.strip('.')
         self.reverse_zone = '%s.' % reverse_zone.strip('.')
         self.lookup = lookup
         self.ttl = ttl
         self.ip_order = ip_order
+        if len(forwarded_zones) > 0:
+            self.forwarded_zones = ['%s.' % z.rstrip('.') for z in forwarded_zones.split(',')]
+        else:
+            self.forwarded_zones = []
 
     def operate(self, _id, event, qstate, qdata):
         """
@@ -28,20 +32,33 @@ class Server:
         :return:
         """
         if event in [MODULE_EVENT_NEW, MODULE_EVENT_PASS]:
-            qname = qstate.qinfo.qname_str
-            if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY] and qname.endswith(self.zone):
-                return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
-            elif qstate.qinfo.qtype in [RR_TYPE_PTR] and qname.endswith(self.reverse_zone):
-                return self.handle_request(_id, event, qstate, qdata, getattr(self, 'reverse_record'))
-            elif qname.endswith(self.zone) or qname.endswith(self.reverse_zone):
-                return self.handle_request_empty(_id, event, qstate, qdata)
-
+            if self.should_handle_request(qstate):
+                return self._operate_forward(_id, event, qstate, qdata)
             return self.handle_pass(_id, event, qstate, qdata)
 
         if event == MODULE_EVENT_MODDONE:
             return self.handle_finished(_id, event, qstate, qdata)
 
         return self.handle_error(_id, event, qstate, qdata)
+
+    def should_handle_request(self, qstate):
+        qname = qstate.qinfo.qname_str
+        for x in self.forwarded_zones:
+            if qname.endswith(x):
+                return False
+        if qname.endswith(self.zone):
+            return True
+        if qname.endswith(self.reverse_zone):
+            return True
+        return False
+
+    def _operate_forward(self, _id, event, qstate, qdata):
+        qname = qstate.qinfo.qname_str
+        if qstate.qinfo.qtype in [RR_TYPE_A, RR_TYPE_ANY] and qname.endswith(self.zone):
+            return self.handle_request(_id, event, qstate, qdata, getattr(self, 'forward_record'))
+        elif qstate.qinfo.qtype in [RR_TYPE_PTR] and qname.endswith(self.reverse_zone):
+            return self.handle_request(_id, event, qstate, qdata, getattr(self, 'reverse_record'))
+        return self.handle_request_empty(_id, event, qstate, qdata)
 
     def handle_request_empty(self, _id, event, qstate, qdata):
         """
@@ -179,8 +196,8 @@ class Caching(Server):
     """This server will serve cached answers.
     """
 
-    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order):
-        Server.__init__(self, zone, reverse_zone, ttl, lookup, ip_order)
+    def __init__(self, zone, reverse_zone, ttl, lookup, ip_order, forwarded_zones):
+        Server.__init__(self, zone, reverse_zone, ttl, lookup, ip_order, forwarded_zones)
         self.cached_requests = {}
 
     def new_dns_msg(self, qname):

@@ -23,7 +23,8 @@ class TestAbstractServer(unittest.TestCase):
         self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 'bogus_ttl'
         self.ip_order = 'bogus_ip_order'
-        self.srv = TestServer(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order)
+        self.forwarded_zones = ''
+        self.srv = TestServer(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order, self.forwarded_zones)
 
     def tearDown(self):
         self.srv = None
@@ -74,7 +75,9 @@ class TestAuthoritativeServer(unittest.TestCase):
         self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 'bogus_ttl'
         self.ip_order = 'bogus_ip_order'
-        self.srv = server.Authoritative(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order)
+        self.forwarded_zones = ''
+        self.srv = server.Authoritative(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order,
+                                        self.forwarded_zones)
 
     def tearDown(self):
         self.srv = None
@@ -108,7 +111,9 @@ class TestCachingServer(unittest.TestCase):
         self.reverse_zone = '127.in-addr.arpa'
         self.ttl = 88888881
         self.ip_order = 'bogus_ip_order'
-        self.srv = server.Caching(self.zone, self.reverse_zone, self.ttl, self.lookup_mock, self.ip_order)
+        self.forwarded_zones = ''
+        self.srv = server.Caching(self.zone, self.reverse_zone, self.ttl, self.lookup_mock, self.ip_order,
+                                  self.forwarded_zones)
 
     def tearDown(self):
         self.srv = None
