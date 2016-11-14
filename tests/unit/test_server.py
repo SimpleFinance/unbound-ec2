@@ -6,6 +6,7 @@ from tests import attrs
 
 class TestServer(server.Server):
     HANDLE_FORWARD_RESULT = 'dummy_handle_forward'
+    HANDLE_PASS_RESULT = True
     DNSMSG = mock.MagicMock()
 
     def handle_request(self, _id, event, qstate, qdata, request_type):
@@ -65,6 +66,20 @@ class TestAbstractServer(unittest.TestCase):
         self.assertEqual(self.srv.operate(id, event, qstate, qdata), TestServer.HANDLE_FORWARD_RESULT)
         qstate.qinfo.qtype = attrs['RR_TYPE_ANY']
         self.assertEqual(self.srv.operate(id, event, qstate, qdata), TestServer.HANDLE_FORWARD_RESULT)
+
+    def test_forwarded_zones(self):
+        server.log_info = mock.Mock()
+        lookup_mock = mock.MagicMock()
+        forwarded_zones = '.subdomain%s' % self.zone
+        self.srv2 = TestServer(self.zone, self.reverse_zone, self.ttl, lookup_mock, self.ip_order, forwarded_zones)
+        id = 'bogus_id'
+        event = attrs['MODULE_EVENT_NEW']
+        qstate = mock.MagicMock()
+        qstate.qinfo.qtype = attrs['RR_TYPE_A']
+        qstate.qinfo.qname_str = 'bogus-name%s' % self.forwarded_zones
+        qdata = mock.MagicMock()
+        self.assertEqual(self.srv.operate(id, event, qstate, qdata), TestServer.HANDLE_PASS_RESULT)
+        qstate.ext_state.__setitem__.assert_called_with(id, attrs['MODULE_WAIT_MODULE'])
 
 
 class TestAuthoritativeServer(unittest.TestCase):
