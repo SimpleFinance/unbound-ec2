@@ -40,13 +40,15 @@ def init(id, cfg):
                                    conf.main['reverse_zone'],
                                    conf.main['ttl'],
                                    _lookup,
-                                   conf.main['ip_order']) \
+                                   conf.main['ip_order'],
+                                   conf.main['forwarded_zones']) \
         if conf.server['type'] == 'authoritative' \
         else server.Caching(conf.main['zone'],
                             conf.main['reverse_zone'],
                             conf.main['ttl'],
                             _lookup,
-                            conf.main['ip_order'])
+                            conf.main['ip_order'],
+                            conf.main['forwarded_zones'])
 
     if conf.lookup['type'] != 'direct':
         _rr = repeater.RecursiveRepeater(conf.main['cache_ttl'], invalidator.CacheInvalidator(_server).invalidate)
@@ -96,5 +98,6 @@ def __print_header(conf):
     log_info('  Lookup filters: %s' % conf.lookup_filters)
     log_info('Name tag include: %s' % conf.lookup['tag_name_include_domain'])
     log_info('        IP order: %s' % conf.main['ip_order'])
+    log_info(' Forwarded zones: %s' % conf.main['forwarded_zones'])
     if conf.lookup['type'] != 'direct':
         log_info('       Cache TTL: %d seconds' % conf.main['cache_ttl'])

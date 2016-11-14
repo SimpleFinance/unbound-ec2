@@ -75,6 +75,28 @@ See unbound_ec2.conf.example and default_unbound.example for more information.
 You can also define ``AWS_ACCESS_KEY`` and ``AWS_SECRET_ACCESS_KEY`` entries in the environment directory.
 When ``unbound-ec2`` is run on an EC2 instance, though, it will automatically use an IAM instance profile if one is available.
 
+
+Configuration - zone forwarding
+-------------------------------
+
+By default unbound will control the whole zone configured for the plugin, however in some cases you might want to delegate
+subdomains to other authoritative name servers. Unbound allows this by using the forward-zone directive:
+
+.. code-block:: yaml
+
+    forward-zone:
+          name: "sub-y.sub-x.example.com"
+          forward-addr: "ns1.sub-y.sub-x.example.com"
+
+
+Additionally, the unbound-ec2 plugin has to be configured with a comma separated list of all subdomains to be forwarded
+in the [main] section of the unbound_ec2.conf configuration file:
+
+.. code-block:: sh
+
+    forwarded_zones = sub-y.sub-x.example.com
+
+
 Considerations
 --------------
 

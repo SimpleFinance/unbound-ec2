@@ -1,0 +1,11 @@
+version: '2'
+services:
+  unbound-server:
+    build: .
+    ports:
+      - 11053:53/udp
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+    volumes:
+      - ./data/config:/etc/unbound

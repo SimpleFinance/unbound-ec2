@@ -13,6 +13,7 @@ DEFAULT_LOOKUP_TYPE = 'cache'
 DEFAULT_LOOKUP_TAG_NAME_INCLUDE_DOMAIN = 'True'
 DEFAULT_LOOKUP_FILTERS = "{'instance-state-name': 'running'}"
 DEFAULT_IP_ORDER = 'private'
+DEFAULT_FORWARDED_ZONES = ''
 
 
 class UnboundEc2Conf(object):
@@ -48,6 +49,8 @@ class UnboundEc2Conf(object):
         self.lookup_filters = self.__try_type(
             os.environ.get('UNBOUND_LOOKUP_FILTERS', DEFAULT_LOOKUP_FILTERS).encode('ascii'))
         self.main['ip_order'] = os.environ.get('UNBOUND_IP_ORDER', DEFAULT_IP_ORDER).encode('ascii')
+        self.main['forwarded_zones'] = os.environ.get('UNBOUND_FORWARDED_ZONES', DEFAULT_FORWARDED_ZONES)\
+            .encode('ascii')
 
     def parse(self):
         """Tries to read defined configuration file and merge values with instance attributes.
